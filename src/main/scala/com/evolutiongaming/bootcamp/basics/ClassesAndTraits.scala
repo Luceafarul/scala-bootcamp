@@ -37,7 +37,11 @@ object ClassesAndTraits {
   //
   // This makes code more reusable and testable.
 
-  sealed trait Shape extends Located with Bounded
+  sealed trait Shape extends Located with Bounded with Movable
+
+  sealed trait Movable {
+    def move(dx: Double, dy: Double): Shape
+  }
 
   sealed trait Located {
     def x: Double
@@ -56,15 +60,31 @@ object ClassesAndTraits {
     override def maxX: Double = x
     override def minY: Double = y
     override def maxY: Double = y
+
+    override def move(dx: Double, dy: Double): Point =
+      Point(x + dx, y + dy)
   }
 
   final case class Circle(centerX: Double, centerY: Double, radius: Double) extends Shape {
-    override def x: Double = ???
-    override def y: Double = ???
-    override def minX: Double = ???
-    override def maxX: Double = ???
-    override def minY: Double = ???
-    override def maxY: Double = ???
+    override val x: Double = centerX
+    override val y: Double = centerY
+    override def minX: Double = x - radius
+    override def maxX: Double = x + radius
+    override def minY: Double = y - radius
+    override def maxY: Double = y + radius
+
+    override def move(dx: Double, dy: Double): Circle =
+      Circle(centerX + dx, centerY + dy, radius)
+  }
+
+  case class Rectangle(x: Double, y: Double, width: Double, height: Double) extends Shape {
+    override def minX: Double = x
+    override def maxX: Double = x + width
+    override def minY: Double = y
+    override def maxY: Double = y + height
+
+    override def move(dx: Double, dy: Double): Rectangle =
+      Rectangle(x + dx, y + dy, width + dx, height + dy)
   }
 
   // Case Classes
@@ -101,16 +121,18 @@ object ClassesAndTraits {
 
       // if needed, fix the code to be correct
       override def minX: Double = objects.map(_.minX).min
-      override def maxX: Double = objects.map(_.minX).min
-      override def minY: Double = objects.map(_.minX).min
-      override def maxY: Double = objects.map(_.minX).min
+      override def maxX: Double = objects.map(_.maxX).max
+      override def minY: Double = objects.map(_.minY).min
+      override def maxY: Double = objects.map(_.maxY).max
     }
   }
 
   // Pattern matching and exhaustiveness checking
   def describe(x: Shape): String = x match {
-    case Point(x, y) => s"Point(x = $x, y = $y)"
-    case Circle(centerX, centerY, radius) => s"Circle(centerX = $centerX, centerY = $centerY, radius = $radius)"
+    case Point(x, y) =>
+      s"Point(x = $x, y = $y)"
+    case Circle(centerX, centerY, radius) =>
+      s"Circle(centerX = $centerX, centerY = $centerY, radius = $radius)"
   }
 
   // Singleton objects are defined using `object`.
@@ -150,9 +172,12 @@ object ClassesAndTraits {
 
   // Question. Do you agree with how the stack is modelled here? What would you do differently?
   final case class Stack[A](elements: List[A] = Nil) {
-    def push(x: A): Stack[A] = ???
-    def peek: A = ???
-    def pop: (A, Stack[A]) = ???
+    def push(x: A): Stack[A] = Stack(x :: elements)
+    def peek: Option[A] = elements.headOption
+    def pop: Option[(A, Stack[A])] = elements match {
+      case Nil => None
+      case head :: tail => Some(head, Stack(tail))
+    }
   }
 
   // Homework

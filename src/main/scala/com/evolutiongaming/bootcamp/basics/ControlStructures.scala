@@ -32,7 +32,12 @@ object ControlStructures {
   // Exercise. Implement a "Fizz-Buzz" https://en.wikipedia.org/wiki/Fizz_buzz function using the if-then-else,
   // returning "fizzbuzz" for numbers which divide with 15, "fizz" for those which divide by 3 and "buzz" for
   // those which divide with 5, and returning the input number as a string for other numbers:
-  def fizzBuzz1(n: Int): String = ???
+  def fizzBuzz1(n: Int): String = {
+    if (n % 15 == 0) "fizzbuzz"
+    else if (n % 3 == 0) "fizz"
+    else if (n % 5 == 0) "buzz"
+    else n.toString
+  }
 
   // Pattern Matching
   //
@@ -46,30 +51,64 @@ object ControlStructures {
   // }
 
   type ErrorMessage = String
+
   def monthName(x: Int): Either[ErrorMessage, String] = {
-    x match {
-      case 1            => Right("January")
-      case 2            => Right("February")
-      case 3            => Right("March")
-      case 4            => Right("April")
-      case 5            => Right("May")
-      case 6            => Right("June")
-      case 7            => Right("July")
-      case 8            => Right("August")
-      case 9            => Right("September")
-      case 10           => Right("October")
-      case 11           => Right("November")
-      case 12           => Right("December")
-      case x if x <= 0  => Left(s"Month $x is too small")
-      case x            => Left(s"Month $x is too large")
-    }
+    val months = Seq(
+      "January", "February", "March",
+      "April", "May", "June",
+      "July", "August", "September",
+      "October", "November", "December"
+    )
+
+    months.lift(x - 1).toRight(if (x <= 0) s"Month $x is too small" else s"Month $x is too large")
   }
 
   // Question. How would you improve `monthName`?
   // Question. What would you use in its place if you wanted to more properly handle multiple locales?
 
+  sealed trait Shape
+
+  object Shape {
+    case object Origin extends Shape
+    final case class Circle(radius: Double) extends Shape
+    final case class Rectangle(width: Double, height: Double) extends Shape
+  }
+
+  import Shape._
+
+  // Typed Pattern
+  def matchOnShape1(s: Shape): String = s match {
+    case Origin => s"Found the origin."
+    case circle: Circle => s"Found a circle $circle."
+    case rectangle: Rectangle => s"Found a rectangle $rectangle."
+  }
+
+  // Unapply the instance of Shape
+  def matchOnShape2(s: Shape): String = s match {
+    case Origin =>
+      s"Found the origin."
+    case Circle(radius) =>
+      s"Found a circle with radius $radius."
+    case Rectangle(width, height) =>
+      s"Found a rectangle with width $width and height $height."
+  }
+
+  def matchOnShape3(s: Shape): String = s match {
+    case Origin =>
+      s"Found the origin."
+    case circle@Circle(radius) =>
+      s"Found a circle $circle with radius $radius."
+    case rectangle@Rectangle(width, height) =>
+      s"Found a rectangle $rectangle with width $width and height $height."
+  }
+
   // Exercise. Implement a "Fizz-Buzz" function using pattern matching:
-  def fizzBuzz2(n: Int): String = ???
+  def fizzBuzz2(n: Int): String = n match {
+    case _ if n % 15 == 0 => "fizzbuzz"
+    case _ if n % 5 == 0 => "buzz"
+    case _ if n % 3 == 0 => "fizz"
+    case _ => n.toString
+  }
 
   // Recursion
   //
@@ -88,9 +127,9 @@ object ControlStructures {
   // @tailrec annotation verifies that a method will be compiled with tail call optimisation.
   @tailrec
   def last[A](list: List[A]): Option[A] = list match {
-    case Nil        => None
-    case x :: Nil   => Some(x)
-    case _ :: xs    => last(xs)
+    case Nil => None
+    case x :: Nil => Some(x)
+    case _ :: xs => last(xs)
   }
 
   // Recursion isn't used that often as it can be replaced with `foldLeft`, `foldRight`,
@@ -158,6 +197,7 @@ object ControlStructures {
     class List[A] {
       def flatMap[B](f: A => List[B]): List[B] = ???
     }
+
   }
 
   // Question. What is the value of this code?
@@ -170,9 +210,11 @@ object ControlStructures {
 
   // For example, for `List` it is defined as:
   object list_filter_example {
+
     class List[A] {
       def filter(p: A => Boolean): List[A] = ???
     }
+
   }
 
   // Question. What is the value of this code?
@@ -207,9 +249,9 @@ object ControlStructures {
 
   // You can also add `if` guards to `for` comprehensions:
   val e = for {
-    x       <- a
+    x <- a
     if x % 2 == 1
-    y       <- b
+    y <- b
   } yield x + y
 
   // Question. What is the value of `e` above?
@@ -222,8 +264,11 @@ object ControlStructures {
 
   trait UserService {
     def validateUserName(name: String): Either[ErrorMessage, Unit]
+
     def findUserId(name: String): Either[ErrorMessage, UserId]
+
     def validateAmount(amount: Amount): Either[ErrorMessage, Unit]
+
     def findBalance(userId: UserId): Either[ErrorMessage, Amount]
 
     /** Upon success, returns the resulting balance */
@@ -279,8 +324,8 @@ object ControlStructures {
     try { // executed until an exception happens
       source.getLines() foreach println
     } catch { // exception handlers
-      case e: FileNotFoundException   => println(s"Couldn't find the file: $e")
-      case e: Exception               => println(s"Exception occurred: $e")
+      case e: FileNotFoundException => println(s"Couldn't find the file: $e")
+      case e: Exception => println(s"Exception occurred: $e")
     } finally { // executed even if an exception happens
       source.close
     }
