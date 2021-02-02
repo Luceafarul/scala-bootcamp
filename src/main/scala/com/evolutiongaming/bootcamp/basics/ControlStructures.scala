@@ -29,8 +29,9 @@ object ControlStructures {
   //    else if (boolean2) result2
   //    else otherResult
 
-  // Exercise. Implement a "Fizz-Buzz" https://en.wikipedia.org/wiki/Fizz_buzz function using the if-then-else,
-  // returning "fizzbuzz" for numbers which divide with 15, "fizz" for those which divide by 3 and "buzz" for
+  // Exercise. Implement a "Fizz-Buzz" https://en.wikipedia.org/wiki/Fizz_buzz function
+  // using the if-then-else, returning "fizzbuzz" for numbers which divide with 15,
+  // "fizz" for those which divide by 3 and "buzz" for
   // those which divide with 5, and returning the input number as a string for other numbers:
   def fizzBuzz1(n: Int): String = {
     if (n % 15 == 0) "fizzbuzz"
@@ -41,8 +42,8 @@ object ControlStructures {
 
   // Pattern Matching
   //
-  // Using the match-case construct we can write constructs equivalent to if-then-else statements in, often,
-  // a more readable and concise form:
+  // Using the match-case construct we can write constructs equivalent to
+  // if-then-else statements in, often, a more readable and concise form:
   //
   // val result = someValue match {
   //    case pattern1                       => result1
@@ -65,13 +66,18 @@ object ControlStructures {
 
   // Question. How would you improve `monthName`?
   // Question. What would you use in its place if you wanted to more properly handle multiple locales?
+  // Store months name in locales file.
 
   sealed trait Shape
 
   object Shape {
+
     case object Origin extends Shape
+
     final case class Circle(radius: Double) extends Shape
+
     final case class Rectangle(width: Double, height: Double) extends Shape
+
   }
 
   import Shape._
@@ -116,11 +122,22 @@ object ControlStructures {
   // express looping constructs in Functional Programming languages.
 
   def sum1(list: List[Int]): Int = {
-    if (list.isEmpty) 0
-    else list.head + sum1(list.tail)
+    @tailrec
+    def loop(xs: List[Int], acc: Int): Int = xs match {
+      case Nil => acc
+      case head :: tail => loop(tail, acc + head)
+    }
+
+    loop(list, acc = 0)
   }
 
-  // Question. What are the risks of List#head and List#tail? How can you refactor `sum1` to avoid these invocations?
+  def sum1Fold(list: List[Int]): Int = {
+    val sum: (Int, Int) => Int = (a, b) => a + b
+    list.foldRight(0)((acc, elem) => sum(acc, elem))
+  }
+
+  // Question. What are the risks of List#head and List#tail?
+  // How can you refactor `sum1` to avoid these invocations?
 
   // Question. What are the risks of recursion when applied without sufficient foresight?
 
@@ -157,14 +174,24 @@ object ControlStructures {
   //
   // Thus `applyNTimesForInts(_ + 1, 4)(3)` should return `((((3 + 1) + 1) + 1) + 1)` or `7`.
   def applyNTimesForInts(f: Int => Int, n: Int): Int => Int = { x: Int =>
-    f(x + n) // replace with a correct implementation
+    @tailrec
+    def loop(f: Int => Int, n: Int, acc: Int): Int =
+      if (n == 0) acc
+      else loop(f, n - 1, f(acc))
+
+    loop(f, n, x)
+
+    // TODO how to rewrite with fold or other built in function?
   }
 
   // Exercise: Convert the function `applyNTimesForInts` into a polymorphic function `applyNTimes`:
   def applyNTimes[A](f: A => A, n: Int): A => A = { x: A =>
-    // replace with correct implementation
-    println(n)
-    f(x)
+    @tailrec
+    def loop(f: A => A, n: Int, acc: A): A =
+      if (n == 0) acc
+      else loop(f, n - 1, f(acc))
+
+    loop(f, n, x)
   }
 
   // `map`, `flatMap` and `filter` are not control structures, but methods that various collections (and
@@ -179,18 +206,20 @@ object ControlStructures {
     class List[A] {
       def map[B](f: A => B): List[B] = ???
     }
+
   }
 
   // Question. What is the value of this code?
   val listMapExample = List(1, 2, 3).map(x => x * 2)
 
-  // As we will see in later lessons, `map` is a method that `Functor`-s have, and there are more `Functor`-s
+  // As we will see in later lessons, `map` is a method that `Functor`-s have,
+  // and there are more `Functor`-s
   // than just collections (`IO`, `Future`, `Either`, `Option` are all `Functor`-s too).
 
   // For now, we will have a utilitarian focus and not go into `Functor`-s and other type classes.
 
-  // `flatMap` is a higher order function which - for collections - transforms each element of the collection
-  // into a collection, and then `flatten`-s these collections.
+  // `flatMap` is a higher order function which - for collections - transforms each element of
+  // the collection into a collection, and then `flatten`-s these collections.
 
   // For example, for `List` it could be defined as:
   object list_flatmap_example { // name-spacing to not break other code in this lesson
@@ -222,8 +251,8 @@ object ControlStructures {
 
   // For Comprehensions
 
-  // A `for-yield` syntax is syntactic sugar for composing multiple `map`, `flatMap` and `filter` operations
-  // together in a more readable form.
+  // A `for-yield` syntax is syntactic sugar for composing multiple
+  // `map`, `flatMap` and `filter` operations together in a more readable form.
 
   // val result = for {
   //   x <- a
@@ -272,22 +301,41 @@ object ControlStructures {
     def findBalance(userId: UserId): Either[ErrorMessage, Amount]
 
     /** Upon success, returns the resulting balance */
-    def updateAccount(userId: UserId, previousBalance: Amount, delta: Amount): Either[ErrorMessage, Amount]
+    def updateAccount(
+      userId: UserId,
+      previousBalance: Amount,
+      delta: Amount
+    ): Either[ErrorMessage, Amount]
   }
 
   // Upon success, should return the remaining amounts on both accounts as a tuple.
-  def makeTransfer(service: UserService, fromUserWithName: String, toUserWithName: String, amount: Amount): Either[ErrorMessage, (Amount, Amount)] = {
+  def makeTransfer(
+    service: UserService,
+    fromUserWithName: String,
+    toUserWithName: String,
+    amount: Amount
+  ): Either[ErrorMessage, (Amount, Amount)] = {
     // Replace with a proper implementation that uses validateUserName on each name,
     // findUserId to find UserId, validateAmount on the amount, findBalance to find previous
     // balances, and then updateAccount for both userId-s (with a positive and negative
     // amount, respectively):
     println(s"$service, $fromUserWithName, $toUserWithName, $amount")
     import service._
-    ???
+    for {
+      _ <- validateAmount(amount)
+      _ <- validateUserName(fromUserWithName)
+      _ <- validateUserName(toUserWithName)
+      fromUserId <- findUserId(fromUserWithName)
+      fromUserPreviousBalance <- findBalance(fromUserId)
+      from <- updateAccount(fromUserId, fromUserPreviousBalance, -amount)
+      toUserId <- findUserId(toUserWithName)
+      toUserPreviousBalance <- findBalance(toUserId)
+      to <- updateAccount(toUserId, toUserPreviousBalance, amount)
+    } yield (from, to)
   }
 
-  // Question. What are the questions would you ask - especially about requirements - before implementing
-  // this function? What issues does this implementation have?
+  // Question. What are the questions would you ask - especially about requirements -
+  // before implementing this function? What issues does this implementation have?
 
   // Question. Does the implementation of `makeTransfer` depend on the "container" being an `Either`?
 
@@ -303,7 +351,12 @@ object ControlStructures {
   //
   // Use a "for comprehension" in your solution.
 
-  val AProductB: Set[(Int, Boolean)] = Set()
+  var A = Set(0, 1, 2)
+  var B = Set(true, false)
+  val AProductB: Set[(Int, Boolean)] = for {
+    a <- A
+    b <- B
+  } yield (a, b)
 
   // Exercise:
   //
@@ -315,7 +368,10 @@ object ControlStructures {
   //
   // Use "map" and `++` (`Set` union operation) in your solution.
 
-  val ASumB: Set[Either[Int, Boolean]] = Set()
+  A = Set(0, 1, 2)
+  B = Set(true, false)
+  val ASumB: Set[Either[Int, Boolean]] =
+    A.map(Left.apply) ++ B.map(Right.apply)
 
   // Scala inherits the standard try-catch-finally construct from Java:
   def printFile(fileName: String): Unit = {
