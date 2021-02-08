@@ -7,7 +7,7 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 class DataStructuresSpec extends AnyFlatSpec with ScalaCheckDrivenPropertyChecks {
   "allSubSetsOfSizeN" should "work correctly on 2 from Set(1, 2, 3)" in {
-    allSubsetsOfSizeN(Set(1, 2, 3), 2) shouldEqual Set(Set(1, 2), Set(2, 3), Set(1, 3))
+    allSubsetsOfSizeN(Set(1, 2, 3, 4, 5), 3) shouldEqual Set(1, 2, 3, 4, 5).subsets(3).toSet//Set(Set(1, 2), Set(2, 3), Set(1, 3))
   }
 
   it should "work correctly" in {

@@ -1,5 +1,6 @@
 package com.evolutiongaming.bootcamp.basics
 
+import scala.annotation.tailrec
 import scala.util.Try
 
 object DataStructures {
@@ -49,7 +50,7 @@ object DataStructures {
 
   val joinLists = immutableList2 ::: List(8, 9) // 1 :: 2 :: 3 :: 8 :: 9 :: Nil
 
-  val headOfList1 = Try(emptyList1.head)// what will happen here?!
+  val headOfList1 = Try(emptyList1.head) // what will happen here?!
   val headOfList2 = emptyList1.headOption // None
   val headOfList3 = immutableList2.headOption // Some(1)
 
@@ -81,7 +82,15 @@ object DataStructures {
   // Exercise. Write a function that checks if all values in a `List` are equal.
   // Think about what you think your function should return if `list` is empty, and why.
   def allEqual[T](list: List[T]): Boolean = {
-    false // TODO: implement
+    @tailrec
+    def loop(xs: List[T], isEqual: Boolean): Boolean = {
+      xs match {
+        case Nil | _ :: Nil => isEqual
+        case head :: second :: tail if isEqual => loop(tail, head.equals(second))
+      }
+    }
+
+    loop(list, isEqual = true)
   }
 
   // Maps
@@ -119,25 +128,33 @@ object DataStructures {
   val tomatoAmountOpt: Option[Int] = vegetableAmounts.get("tomatoes")
   val carrotAmountWithDefault: Int = vegetableAmounts.getOrElse("carrots", 0)
 
-  // Exercise. Calculate the total cost of all vegetables, taking vegetable amounts (in units) from
-  // `vegetableAmounts` and prices per unit from `vegetablePrices`. Assume the price is 10 if not available
-  // in `vegetablePrices`.
+  // Exercise.
+  // Calculate the total cost of all vegetables, taking vegetable amounts (in units) from
+  // `vegetableAmounts` and prices per unit from `vegetablePrices`.
+  // Assume the price is 10 if not available in `vegetablePrices`.
   val totalVegetableCost: Int = {
-    17 // implement here
+    val defaultPrice = 10
+    vegetableAmounts.map { case (vegetable, amount) =>
+      vegetablePrices.withDefaultValue(defaultPrice)(vegetable) * amount
+    }.sum
   }
 
-  // Exercise. Given the vegetable weights (per 1 unit of vegetable) in `vegetableWeights` and vegetable
-  // amounts (in units) in `vegetableAmounts`, calculate the total weight per type of vegetable, if known.
+  // Exercise.
+  // Given the vegetable weights (per 1 unit of vegetable) in `vegetableWeights`
+  // and vegetable amounts (in units) in `vegetableAmounts`,
+  // calculate the total weight per type of vegetable, if known.
   //
   // For example, the total weight of "olives" is 2 * 32 == 64.
-  val totalVegetableWeights: Map[String, Int] = { // implement here
-    Map()
+  val totalVegetableWeights: Map[String, Int] = {
+    vegetableWeights.map { case (vegetable, weight) =>
+      vegetable -> vegetableAmounts.get(vegetable).map(amount => amount * weight)
+    }.filter { case (_, a) => a.isDefined }.map { case (v, a) => v -> a.get }
   }
 
   // Ranges and Sequences
-  val inclusiveRange: Seq[Int] = 2 to 4    // 2, 3, 4, or <=
+  val inclusiveRange: Seq[Int] = 2 to 4 // 2, 3, 4, or <=
   val exclusiveRange: Seq[Int] = 2 until 4 // 2, 3, or <
-  val withStep: Seq[Int] = 2 to 40 by 7    // 2, 9, 16, 23, 30, 37
+  val withStep: Seq[Int] = 2 to 40 by 7 // 2, 9, 16, 23, 30, 37
 
   // Seq, IndexedSeq and LinearSeq traits are implemented by many collections and contain various useful
   // methods. See https://docs.scala-lang.org/overviews/collections/seqs.html in case you are interested
@@ -185,16 +202,15 @@ object DataStructures {
   // - takeWhile
   // - zip
 
-  // Exercise: Return a set with all subsets of the provided set `set` with `n` elements
+  // Exercise:
+  // Return a set with all subsets of the provided set `set` with `n` elements
   // For example, `allSubsetsOfSizeN(Set(1, 2, 3), 2) == Set(Set(1, 2), Set(2, 3), Set(1, 3))`.
   // Hints for implementation:
   //   - Handle the trivial case where `n == 1`.
-  //   - For other `n`, for each `set` element `elem`, generate all subsets of size `n - 1` from the set
-  //     that don't include `elem`, and add `elem` to them.
+  //   - For other `n`, for each `set` element `elem`, generate all subsets of size `n - 1`
+  //     from the set that don't include `elem`, and add `elem` to them.
   def allSubsetsOfSizeN[A](set: Set[A], n: Int): Set[Set[A]] = {
-    // replace with correct implementation
-    println(n)
-    Set(set)
+    ???
   }
 
   // Homework
@@ -214,5 +230,8 @@ object DataStructures {
   //
   // Input `Map("a" -> 1, "b" -> 2, "c" -> 4, "d" -> 1, "e" -> 0, "f" -> 2, "g" -> 2)` should result in
   // output `List(Set("e") -> 0, Set("a", "d") -> 1, Set("b", "f", "g") -> 2, Set("c") -> 4)`.
-  def sortConsideringEqualValues[T](map: Map[T, Int]): List[(Set[T], Int)] = ???
+  def sortConsideringEqualValues[T](map: Map[T, Int]): List[(Set[T], Int)] = {
+    map.groupMap { case (_, value) => value } { case (key, _) => key }
+      .map { case (key, value) => value.toSet -> key }.toList
+  }
 }
