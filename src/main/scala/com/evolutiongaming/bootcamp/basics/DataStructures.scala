@@ -148,7 +148,9 @@ object DataStructures {
   val totalVegetableWeights: Map[String, Int] = {
     vegetableWeights.map { case (vegetable, weight) =>
       vegetable -> vegetableAmounts.get(vegetable).map(amount => amount * weight)
-    }.filter { case (_, a) => a.isDefined }.map { case (v, a) => v -> a.get }
+    }.collect { case (veg, Some(amount)) => veg -> amount }
+
+  // Solution with filter: .flatMap { case (veg, amount) => amount.map { veg -> _ } }
   }
 
   // Ranges and Sequences
