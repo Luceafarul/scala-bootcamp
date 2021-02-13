@@ -9,11 +9,11 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 class FunctionsSpec extends AnyFlatSpec with ScalaCheckDrivenPropertyChecks {
 
   "isEven" should "work correctly" in {
-    isEven(2) shouldEqual true
-    isEven(3) shouldEqual false
+    isEven(2) shouldBe true
+    isEven(3) shouldBe false
 
-    isEven(-2) shouldEqual true
-    isEven(-3) shouldEqual false
+    isEven(-2) shouldBe true
+    isEven(-3) shouldBe false
   }
 
   "identity" should "work correctly" in {

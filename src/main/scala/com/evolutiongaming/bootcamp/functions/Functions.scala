@@ -1,6 +1,7 @@
 package com.evolutiongaming.bootcamp.functions
 
 import java.time.Instant
+import scala.util.Try
 
 object Functions {
   // Functions are expressions that have parameters, and take arguments.
@@ -22,6 +23,11 @@ object Functions {
   def clean2(message: String): String = {
     // `s` is a parameter and may be omitted
     val f: String => String = s => s.replaceAll("fox", "***")
+
+    // Same definition of f function
+    // val f: String => String = _.replace("fox", "***")
+    // val f = (s: String) => s.replace("fox", "***")
+
     processText(message, f)
   }
 
@@ -32,13 +38,13 @@ object Functions {
 
   // Exercise.
   // Implement `isEven` a function that checks if a number is even
-  def isEven(x: Int): Boolean = ???
+  def isEven(x: Int): Boolean = x % 2 == 0
 
   // Implement `isEvenVal` which behaves exactly like `isEven`.
-  // val isEvenVal: Int => Boolean = ???
+  val isEvenVal: Int => Boolean = _ % 2 == 0
 
   // Implement `isEvenDefToVal` by transforming `isEven` def function into a val
-  // val isEvenDefToVal: Int => Boolean = ???
+  val isEvenDefToVal: Int => Boolean = isEven
 
   // --
 
@@ -79,30 +85,46 @@ object Functions {
 
   // Subclassing Functions
   // One nice aspect of functions being traits is that we can subclass the function type
-
   trait MyMap[K, V] extends (K => V)
 
   // Question. What should we extend to ..
 
   // check if an element belongs to a set
-  // > trait MySet[A] extends ???
+  trait MySet[A] extends (A => Boolean)
 
   // return a value by its index
-  // > trait MySeq[A] extends ???
+  trait MySeq[A] extends (Int => A)
 
   // --
 
   // Polymorphic functions has at least one type parameter
   // A type parameter is a form of encapsulation
+  // But, we can't do this with val :(
 
   def x[T](v: T) = ???
 
   // Exercise.
   // Implement `mapOption` a function. Do not use scala option api
-  def mapOption[A, B](option: Option[A], f: A => B): Option[B] = ???
+  def mapOption[A, B](option: Option[A], f: A => B): Option[B] = option match {
+    case Some(value) => Some(f(value))
+    case None => None
+  }
 
   // --
 
+  // Functions composition
+
+  val strToInt: String => Int = _.toInt
+  val intToBool: Int => Boolean = {
+    case 1 => true
+    case _ => false
+  }
+
+  val strToBool1: String => Boolean = t => intToBool(strToInt(t))
+  val strToBool2: String => Boolean = intToBool.compose(strToInt)
+  val strToBool3: String => Boolean = strToInt.andThen(intToBool)
+
+  // --
 
   // The pattern matching block expands to the Function1 instance
   val pingPong: String => String = {
@@ -155,11 +177,11 @@ object Functions {
     if (from == to) message else message.reverse
   }
 
-  def translateFromRus: (Language, String) => String =
+  val translateFromRus: (Language, String) => String =
     (to: String, message: Language) => translate(message, "rus", to)
 
   // `=>` has right associative law
-  def translateF: Language => (Language => (String => String)) =
+  val translateF: Language => (Language => (String => String)) =
     (from: Language) => (to: Language) => (message: String) => translate(message, from, to)
 
   val fromRu = translateF("ru")
@@ -196,11 +218,11 @@ object Functions {
     map(key)
 
   // Pure function should:
+  // - be deterministic
+  // - not have side effects
   // - be total (not partial)
   // - not throw exceptions
-  // - be deterministic
   // - not do any mutation (local, non-local, reference, etc.)
-  // - not have side effects
   // - not use `null`
 
   // A function without side effects only returns a value
@@ -223,15 +245,17 @@ object Functions {
 
   //
   def parseDate(s: String): Instant = Instant.parse(s)
-  def parseDatePure(s: String): ??? = ???
+  def parseDatePure(s: String): Option[Instant] = Try(Instant.parse(s)).toOption
 
   //
   def divide(a: Int, b: Int): Int = a / b
-  def dividePure(a: Int, b: Int): ??? = ???
+  def dividePure(a: Int, b: Int): Option[Int] = Option.when(b != 0)(a / b)
 
   //
   def isAfterNow(date: Instant): Boolean = date.isAfter(Instant.now())
-  def isAfterNowPure(/* ??? */): Boolean = ???
+  def isAfterNowPure(date: Instant, nowProvide: () => Instant): Boolean = date.isAfter(nowProvide())
+  def isAfterNowTruePure(date: Instant, nowProvide: () => Instant): () => Boolean =
+    () => date.isAfter(nowProvide())
 
   //
   case class Nel[T](head: T, rest: List[T])
@@ -239,7 +263,11 @@ object Functions {
     if (list.isEmpty) println("ERROR: provide non empty list")
     Nel(list.head, list.tail)
   }
-  def nelPure[T](list: List[T]): ??? = ???
+
+  def nelPure[T](list: List[T]): Either[String, Nel[T]] = list match {
+    case Nil => Left("ERROR: provide non empty list")
+    case _ => Right(Nel(list.head, list.tail))
+  }
 
   // --
 

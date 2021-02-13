@@ -49,7 +49,9 @@ object AlgebraicDataTypes {
   // compile time is `Age`, but at runtime, the representation is `Int`. Case classes can also be used to
   // define value classes, see `Name`.
   class Age(val value: Int) extends AnyVal
-  final case class Name(value: String) extends AnyVal
+  final case class Name(value: String) extends AnyVal {
+    // val drString = s"Dr. $value"
+  }
 
   // Type aliases may seem similar to value classes, but they provide no additional type safety. They can,
   // however, increase readability of the code in certain scenarios.
@@ -67,14 +69,21 @@ object AlgebraicDataTypes {
   // Exercise. Create a smart constructor for `GameLevel` that only permits levels from 1 to 80.
   final case class GameLevel private (value: Int) extends AnyVal
   object GameLevel {
-    def create(value: Int): Option[GameLevel] = ???
+    def create(value: Int): Option[GameLevel] = value match {
+      case n if n >= 1 && n <= 80 => Some(new GameLevel(n))
+      case _ => None
+    }
   }
 
   // To disable creating case classes in any other way besides smart constructor, the following pattern
   // can be used. However, it is rather syntax-heavy and cannot be combined with value classes.
   sealed abstract case class Time private (hour: Int, minute: Int)
   object Time {
-    def create(hour: Int, minute: Int): Either[String, Time] = Right(new Time(hour, minute) {})
+    def create(hour: Int, minute: Int): Either[String, Time] = (hour, minute) match {
+      case (h, _) if h < 0 || h > 23 => Left("Invalid hour value")
+      case (_, m) if m < 0 || m > 59 => Left("Invalid minute value")
+      case (h, m) => Right(new Time(h, m) {})
+    }
   }
 
   // Exercise. Implement the smart constructor for `Time` that only permits values from 00:00 to 23:59 and
@@ -107,6 +116,7 @@ object AlgebraicDataTypes {
   final case class AccountNumber(value: String) extends AnyVal
   final case class CardNumber(value: String) extends AnyVal
   final case class ValidityDate(month: Int, year: Int)
+
   sealed trait PaymentMethod
   object PaymentMethod {
     final case class BankAccount(accountNumber: AccountNumber) extends PaymentMethod
@@ -133,7 +143,11 @@ object AlgebraicDataTypes {
     creditCardService: CreditCardService,
     cashService: CashService,
   ) {
-    def processPayment(amount: BigDecimal, method: PaymentMethod): PaymentStatus = ???
+    def processPayment(amount: BigDecimal, method: PaymentMethod): PaymentStatus = method match {
+      case BankAccount(accountNumber) => bankAccountService.processPayment(amount, accountNumber)
+      case creditCard: CreditCard => creditCardService.processPayment(amount, creditCard)
+      case Cash => cashService.processPayment(amount)
+    }
   }
 
   // Let's compare that to `NaivePaymentService.processPayment` implementation, which does not use ADTs, but

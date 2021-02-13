@@ -1,5 +1,9 @@
 package com.evolutiongaming.bootcamp.functions
 
+import com.evolutiongaming.bootcamp.testing.Json
+
+import scala.annotation.tailrec
+
 object FunctionsDescoped {
   //
   var count = 0
@@ -8,10 +12,10 @@ object FunctionsDescoped {
     count += 1
     newId
   }
-  def idPure(/* ??? */): (Int, Int) = ???
+  def idPure(seed: Int): (Int, Int) = (seed, seed + 1)
 
   // Implement `identity` which returns its input unchanged. Do not use scala.Predef.identity
-  def identity[A](x: A): A = ???
+  def identity[A](x: A): A = x
 
   // Question. What do you expect?
 
@@ -35,7 +39,8 @@ object FunctionsDescoped {
   // --
 
   // Functions can be used as building blocks of our program using the composition of functions
-  // `scala.Function1[A, B]` has `compose` and `andThen` methods that takes a function param and returns a new function
+  // `scala.Function1[A, B]` has `compose` and `andThen` methods
+  // that takes a function param and returns a new function
 
   // Compose - `g` will be applied to input param
   // def compose[A](g: A => T1): A => R = { x => apply(g(x)) }
@@ -54,10 +59,11 @@ object FunctionsDescoped {
   List(1, 2, 3).map(((x: Int) => x + 2).andThen(x => x.toString))
 
 
-  // Exercise. Implement `andThen` and `compose` which pipes the result of one function to the input of another function
-  def compose[A, B, C](f: B => C, g: A => B): A => C = ???
+  // Exercise. Implement `andThen` and `compose`
+  // which pipes the result of one function to the input of another function
+  def compose[A, B, C](f: B => C, g: A => B): A => C = x => f(g(x))
 
-  def andThen[A, B, C](f: A => B, g: B => C): A => C = ???
+  def andThen[A, B, C](f: A => B, g: B => C): A => C = x => g(f(x))
 
 
   // --
@@ -84,15 +90,10 @@ object FunctionsDescoped {
   // Representing JSON in Scala as a sealed family of case classes
   // JSON is a recursive data structure
   sealed trait Json
-
-  case class JObject(/* ??? */) extends Json
-
-  case class JArray(/* ??? */) extends Json
-
-  case class JString(/* ??? */) extends Json
-
+  case class JObject(entries: Map[String, Json]) extends Json
+  case class JArray(value: List[Json]) extends Json
+  case class JString(value: String) extends Json
   case class JNumber(value: BigDecimal) extends Json
-
   case class JBoolean(value: Boolean) extends Json
 
   // Question. What did I miss?
@@ -102,20 +103,42 @@ object FunctionsDescoped {
 
 
   // Task 1. Represent `rawJson` string via defined classes
-  val data: Json = JObject(/* ??? */)
+  val data: Json = JObject(Map(
+    "username" -> JString("John"),
+    "address" -> JObject(Map("" -> JString(""), "" -> JString(""))),
+    "eBooks" -> JArray(List(JString("Scala"), JString("Dotty")))
+  ))
 
   // Task 2. Implement a function `asString` to print given Json data as a json string
+  def asString(data: Json): String = {
+    data match {
+      case JObject(value) => value.map { case (_, value) => asString(value) }.mkString
+      case JArray(value) => value.mkString
+      case JString(value) => value
+      case JNumber(value) => value.toString()
+      case JBoolean(value) => value.toString
+    }
+  }
 
-  def asString(data: Json): String = ???
-
-  // Task 3. Implement a function that validate our data whether it contains JNumber with negative value or not
-
-  def isContainsNegative(data: Json): Boolean = ???
+  // Task 3. Implement a function that validate our data
+  // whether it contains JNumber with negative value or not
+  def isContainsNegative(data: Json): Boolean = data match {
+    case JObject(value) => value.map { case (_, value) =>  isContainsNegative(value) }.forall(x => x)
+    case JArray(value) => value.forall(isContainsNegative)
+    case JNumber(value) => value < 0
+    case _ => false
+  }
 
   // Task 4. Implement a function that return the nesting level of json objects.
   // Note. top level json has level 1, we can go from top level to bottom only via objects
+  def nestingLevel(data: Json): Int = {
+    def loop(data: Json, nestingLevel: Int): Int = data match {
+      case JObject(value) => value.map { case (_, obj @ JObject(_)) => loop(obj, nestingLevel + 1) }.last
+      case _ => nestingLevel
+    }
 
-  def nestingLevel(data: Json): Int = ???
+    loop(data, 1)
+  }
 
   // See FunctionsSpec for expected results
 }
