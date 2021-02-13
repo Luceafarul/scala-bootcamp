@@ -1,5 +1,7 @@
 package com.evolutiongaming.bootcamp.adt
 
+import scala.annotation.tailrec
+
 object AlgebraicDataTypes {
 
   // ALGEBRAIC DATA TYPES
@@ -165,7 +167,21 @@ object AlgebraicDataTypes {
   // Exercise. Define an Algebraic Data Type `Car`, which has a manufacturer, a model, a production year,
   // and a license plate number (can contain from 3 to 8 upper case letters and numbers). Use value classes
   // and smart constructors as appropriate.
-  type Car = Nothing
+  // type Car = Nothing
+
+  final case class Model(model: String) extends AnyVal
+  final case class Year private(year: Int) extends AnyVal
+  final case class LicensePlateNumber private(licenseNumber: String) extends AnyVal
+  object LicensePlateNumber {
+    def apply(licenseNumber: String): LicensePlateNumber = licenseNumber match {
+      case license
+        if license.length >= 3 && license.length <= 8
+          && license.forall(ch => ch.isDigit || ch.isLetter) => new LicensePlateNumber(licenseNumber.toUpperCase)
+      case _ => new LicensePlateNumber("UNKNOWN")
+    }
+  }
+
+  final case class Car(model: Model, productionYear: Year, licenseNumber: LicensePlateNumber)
 
   // Homework. Define all algebraic data types, which would be needed to implement “Hold’em Hand Strength”
   // task you completed to join the bootcamp. Use your best judgement about particular data types to include
