@@ -1,8 +1,12 @@
+import sbt.ThisBuild
+
 name := "scala-bootcamp"
 
 version := "0.2"
 
 scalaVersion := "2.13.4"
+
+enablePlugins(BulkySourcesPlugin)
 
 // From https://tpolecat.github.io/2017/04/25/scalac-flags.html
 scalacOptions ++= Seq(
@@ -78,3 +82,12 @@ libraryDependencies ++= Seq(
 addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full)
 
 run / fork := true
+
+lazy val bulkySourcesPlugin = (project in file("bulky_sources_plugin"))
+  .enablePlugins(SbtPlugin)
+  .settings(
+    ThisBuild / version := "0.1",
+    ThisBuild / organization := "com.example",
+    name := "bulky-sources-plugin",
+    scalaVersion := "2.12.10"
+  )
