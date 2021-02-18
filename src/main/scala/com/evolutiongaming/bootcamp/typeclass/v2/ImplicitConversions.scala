@@ -3,13 +3,19 @@ package com.evolutiongaming.bootcamp.typeclass.v2
 
 object BasicImplicitConversion extends App {
   case class A(x: Int)
-  case class B(x: Int)
+  case class B(x: Int) {
+    def methodFromClassB(): Unit = println("Hello B")
+  }
 
   implicit def conversion(a: A): B = B(a.x)
+//  When we have 2 or more same implicit, get compile error
+//  Note that implicit conversions are not applicable because they are ambiguous:
+//  implicit def secondConversion(a: A): B = B(a.x)
 
   def myMethod(b: B): Unit = println(b)
 
   myMethod(A(123))
+  A(21).methodFromClassB()
 }
 
 object ImplicitConversionChaining extends App {
@@ -76,5 +82,9 @@ object ImplicitConversionsSugar extends App {
 
 object Task {
   // write an implicit class so the next line compiles
-  // val b: Boolean = List(true, true).allTrue
+  implicit class ListExt(list: List[Boolean]) {
+    def allTrue: Boolean = list.forall(_ == true)
+  }
+
+   val b: Boolean = List(true, true).allTrue
 }

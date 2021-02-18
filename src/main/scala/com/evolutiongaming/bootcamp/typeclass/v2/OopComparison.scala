@@ -23,6 +23,7 @@ object Oop extends App {
   printBeautifully(User("Oleg"))
 }
 
+// Typeclass is a trait with type parameter
 // the main idea behind typeclass is here
 // ask questions if you can't understand what is going on
 object Fp extends App {
@@ -55,11 +56,20 @@ object Fp extends App {
   object InstancesTask {
     final case class Player(id: Int, login: String)
 
-    implicit val playerJsonable: Jsonable[Player] = ???
+    implicit val playerJsonable: Jsonable[Player] =
+      (entity: Player) => Json(
+        s"""
+           |{
+           |"id": "${entity.id}",
+           |"login": "${entity.login}",
+           |}""".stripMargin)
 
-    implicit val intJsonable: Jsonable[Int] = ???
+    implicit val intJsonable: Jsonable[Int] = (n: Int) => Json(s"$n")
 
-    implicit val optionIntJsonable: Jsonable[Option[Int]] = ???
+    implicit val optionIntJsonable: Jsonable[Option[Int]] = {
+      case None => Json("")
+      case Some(value) => Json(s"$value")
+    }
   }
 
   // you will definitely get it but maybe a bit later and its ok
