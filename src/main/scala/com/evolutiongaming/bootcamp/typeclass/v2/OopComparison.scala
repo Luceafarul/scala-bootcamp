@@ -6,6 +6,7 @@ import com.evolutiongaming.bootcamp.typeclass.v2.Summoner.Jsonable
 final case class Json(s: String) // my very basic json class
 
 object Oop extends App {
+
   trait Jsonable {
     def toJson: Json
   }
@@ -54,6 +55,7 @@ object Fp extends App {
   printBeautifully(User("Oleg"))
 
   object InstancesTask {
+
     final case class Player(id: Int, login: String)
 
     implicit val playerJsonable: Jsonable[Player] =
@@ -75,18 +77,13 @@ object Fp extends App {
   // you will definitely get it but maybe a bit later and its ok
   object GenericImplicitsTask {
     // the thing can convert to json any options which is super useful
-    implicit def optionJsonable[A](implicit jsonableA: Jsonable[A]): Jsonable[Option[A]] = new Jsonable[Option[A]] {
-      def toJson(entity: Option[A]): Json = {
-        entity match {
-          case Some(value) => jsonableA.toJson(value)
-          case None => Json("null")
-        }
-      }
+    implicit def optionJsonable[A](implicit jsonableA: Jsonable[A]): Jsonable[Option[A]] = {
+      case Some(value) => jsonableA.toJson(value)
+      case None => Json("null")
     }
 
-    implicit def listJsonable[A](implicit jsonableA: Jsonable[A]): Jsonable[List[A]] = new Jsonable[List[A]] {
-      def toJson(entity: List[A]): Json = ???
-    }
+    implicit def listJsonable[A](implicit jsonableA: Jsonable[A]): Jsonable[List[A]] =
+      (entity: List[A]) => Json(s"[${entity.map(jsonableA.toJson)}]")
   }
 }
 
@@ -117,6 +114,7 @@ object ContextBound {
 }
 
 object Summoner {
+
   object Jsonable { // but it gets a companion object
 
     // with nice summon method (could have any name, apply for eg)
@@ -153,7 +151,9 @@ object Syntax {
   }
 
   // to
+
   import JsonableSyntax._
+
   def printBeautifully[A: Jsonable](x: A): Unit = {
     println(x.toJson)
   }
@@ -178,10 +178,13 @@ object Result {
         j.toJson(x)
       }
     }
+
   }
 
   // --- library which makes use of json (for example some http library) ---
+
   import JsonableSyntax._
+
   def printBeautifully[A: Jsonable](x: A): Unit = {
     println(x.toJson)
   }
