@@ -305,6 +305,7 @@ object Variance {
       | MyType[A] -> MyType[B] | MyType[A] <- MyType[B] |
       +------------------------+------------------------+
     Lets say Int is a Number
+
     List has + because
     if I want List[Number] I can have List[Int] instead
     JsonPrinter (it converts a type to json) would have - because

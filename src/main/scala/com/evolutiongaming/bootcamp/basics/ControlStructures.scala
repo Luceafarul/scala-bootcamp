@@ -243,7 +243,6 @@ object ControlStructures {
     class List[A] {
       def filter(p: A => Boolean): List[A] = ???
     }
-
   }
 
   // Question. What is the value of this code?
@@ -293,11 +292,8 @@ object ControlStructures {
 
   trait UserService {
     def validateUserName(name: String): Either[ErrorMessage, Unit]
-
     def findUserId(name: String): Either[ErrorMessage, UserId]
-
     def validateAmount(amount: Amount): Either[ErrorMessage, Unit]
-
     def findBalance(userId: UserId): Either[ErrorMessage, Amount]
 
     /** Upon success, returns the resulting balance */
