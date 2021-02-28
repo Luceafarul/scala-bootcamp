@@ -1,5 +1,7 @@
 package com.evolutiongaming.bootcamp.typeclass
 
+import scala.collection.immutable.{AbstractMap, SeqMap, SortedMap}
+
 object HigherKindedTypes {
 
   /* 1. Higher Order Functions
@@ -191,31 +193,31 @@ object HigherKindedTypes {
   ┌───────────────────────┬───────┐
   │         Type          │ Order │
   ├───────────────────────┼───────┤
-  │   Option[_]           │ ???   │
+  │   Option[_]           │ 0     │
   │                       │       │
-  │   Map[_, _]           │ ???   │
+  │   Map[_, _]           │ 1     │
   │                       │       │
   │   trait Maybe[T]      │       │
-  │   Maybe[_]            │ ???   │
+  │   Maybe[_]            │ 1     │
   │                       │       │
   │   trait Functor[F[_]] │       │
-  │   Functor[_[_]]       │ ???   │
+  │   Functor[_[_]]       │ 2     │
   └───────────────────────┴───────┘
    */
 
   /* Exercise 7. Fill out missed kinds for the following types:
 
-  ┌─────────────────────┬──────────────────┐
-  │        Type         │       Kind       │
-  ├─────────────────────┼──────────────────┤
-  │ String              │ ???              │
-  │ Option[_]           │ ???              │
-  │ List[_]             │ ???              │
-  │ Functor[_[_]]       │ ???              │
-  │ Set[_]              │ ???              │
-  │ Map[_, _]           │ ???              │
-  │ Kleisli[_[_], _, _] │ ???              │
-  └─────────────────────┴──────────────────┘
+  ┌─────────────────────┬────────────────────────┐
+  │        Type         │       Kind             │
+  ├─────────────────────┼────────────────────────┤
+  │ String              │ *                      │
+  │ Option[_]           │ * -> *                 │
+  │ List[_]             │ * -> *                 │
+  │ Functor[_[_]]       │ (* -> *) -> *          │
+  │ Set[_]              │ * -> *                 │
+  │ Map[_, _]           │ * -> * -> *            │
+  │ Kleisli[_[_], _, _] │ (* -> *) -> * -> * -> *│ // wrong, my answer was (* -> *) -> * -> *
+  └─────────────────────┴────────────────────────┘
    */
 
   /* 3. The intuition behind HKT
@@ -246,9 +248,10 @@ object HigherKindedTypes {
   // `Maybe` is defined for any type `A` as we don't use any specifics of A. We abstract over this type.
 
   // Exercise 8. Implement `Disjunction` – your own version of `Either`
-  sealed trait Disjunction[???]
+  sealed trait Disjunction[+A, +B]
   object Disjunction {
-    // ???
+    case class Left[+A, +B](value: A) extends Disjunction[A, B]
+    case class Right[+A, +B](value: B) extends Disjunction[A, B]
   }
 
   /*
@@ -263,11 +266,23 @@ object HigherKindedTypes {
   // 1. Typeclass interface
   trait Functor[F[_]] {
     def fmap[A, B](fa: F[A])(f: A => B): F[B]
+
+    // Identity function?
+    // def zero[A]: F[A]
   }
 
   // 2. Syntax helper
+  // как лучше писать? или это дело вкуса? Как называется такая запись [F[_]: Functor]
   implicit class FunctorOps[F[_], A](fa: F[A])(implicit functor: Functor[F]) {
-    def fmap[B](f: A => B): F[B] = implicitly[Functor[F]].fmap(fa)(f)
+//    def fmap[B](f: A => B): F[B] = implicitly[Functor[F]].fmap(fa)(f)
+
+    // Так можно записать благодаря summoner-у
+    def fmap[B](f: A => B): F[B] = Functor[F].fmap(fa)(f)
+  }
+
+  // Summoners???
+  object Functor {
+    def apply[F[_]: Functor]: Functor[F] = implicitly[Functor[F]]
   }
 
   /*
@@ -294,7 +309,13 @@ object HigherKindedTypes {
   // 3.2. For `List`
   // Exercise 9. Implement for `List`
   implicit val listFunctor: Functor[List] = new Functor[List] {
-    override def fmap[A, B](fa: List[A])(f: A => B): List[B] = ???
+    override def fmap[A, B](fa: List[A])(f: A => B): List[B] = {
+      // TODO replace with tail rec
+      fa match {
+        case Nil => Nil
+        case head :: tail => f(head) :: fmap(tail)(f)
+      }
+    }
   }
 
   // So now we can use `map` for any type `F` for which we have `Functor[F]` implemented.
@@ -313,12 +334,22 @@ object HigherKindedTypes {
   def funcLikeFunctor(f: Any => Any): Any    = ??? // (* -> *) -> *
   def funcLikeMap(key: Any, value: Any): Any = ??? // * -> * -> *
 
+  // 1. Currying
+  def funcLikeMap1(key: Any)(value: Any): Any = funcLikeMap(key, value)
+
+  // 2. Fixed argument
+  val fixed: Any => Any = funcLikeMap1("FIXED")
+
+  //  Functor[Map[String, Any]]
+
+  type M[D] = Map[String, D]
+
   /*
   Exercise 10. How can we pass `funcLikeMap` into `funcLikeFunctor` so code will compile?
   Tip: We can have its own "functor" for each needed "key".
    */
 
-  // funcLikeFunctor(??? funcLikeMap ???)
+   funcLikeFunctor(fixed)
 
   /*
   So we've converted kind (* -> * -> *) to kind (* -> *).
@@ -340,9 +371,23 @@ object HigherKindedTypes {
 
   implicit val mapFunctor3: Functor[Map[String, *]] = ???
 
+  // It's like
+  // _ is thee same as * in type
+  def funcLikeFunctor2(f: Any => Any): Any    = ??? // (* -> *) -> *
+  def funcLikeMap2(key: Any, value: Any): Any = ??? // * -> * -> *
+  funcLikeFunctor2(funcLikeMap2("FIXED", _))
+
   // Exercise 11. Implement Functor for `Map`.
-  implicit def mapFunctor4[T]: Functor[Map[T, *]] = ???
+  implicit def mapFunctor4[T]: Functor[Map[T, *]] = new Functor[Map[T, *]] {
+    override def fmap[A, B](fa: Map[T, A])(f: A => B): Map[T, B] =
+      fa.transform { case (_, value) => f(value) }
+  }
 
   // Exercise 12. Implement Functor for `Disjunction`
-  // implicit val disjunctionFunctor = ???
+   implicit val disjunctionFunctor: Functor[Disjunction[E, *]] = new Functor[Disjunction[E, *]] {
+     override def fmap[A, B](fa: Disjunction[E, A])(f: A => B): Disjunction[E, B] = fa match {
+       case Disjunction.Left(value) => Disjunction.Left(value)
+       case Disjunction.Right(value) => Disjunction.Right(f(value))
+     }
+   }
 }
