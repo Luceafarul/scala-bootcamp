@@ -1,6 +1,9 @@
 package com.evolutiongaming.bootcamp.error_handling
 
+import com.evolutiongaming.bootcamp.error_handling.ErrorHandling.TransferError.{AmountIsTooLarge, NegativeAmount, TooManyDecimals, ZeroAmount}
+
 import scala.concurrent.Future
+import scala.util.Try
 import scala.util.control.NonFatal
 
 object ErrorHandling extends App {
@@ -55,7 +58,10 @@ object ErrorHandling extends App {
   // can go wrong or there is no interest in a particular reason for a failure.
 
   // Exercise. Implement `parseIntOption` method.
-  def parseIntOption(string: String): Option[Int] = ???
+  def parseIntOption(string: String): Option[Int] =
+    string.toIntOption
+    //Try(Integer.parseInt(string)).toOption
+    //Option(Integer.parseInt(string)) -- my solution
 
   // The downside of Option is that it does not encode any information about what exactly went wrong. It only
   // states the mere fact that it did.
@@ -69,7 +75,8 @@ object ErrorHandling extends App {
 
   // Exercise. Implement `parseIntEither` method, returning the parsed integer as `Right` upon success and
   // "{{string}} does not contain an integer" as `Left` upon failure.
-  def parseIntEither(string: String): Either[String, Int] = ???
+  def parseIntEither(string: String): Either[String, Int] =
+    Try(Integer.parseInt(string)).toEither.left.map(_.getMessage)
 
   // As an alternative to `String`, a proper ADT can be introduced to formalize all error cases. As discussed
   // in `AlgebraicDataTypes` section, this provides a number of benefits, including an exhaustiveness check
@@ -89,7 +96,21 @@ object ErrorHandling extends App {
   }
   // Exercise. Implement `credit` method, returning `Unit` as `Right` upon success and the appropriate
   // `TransferError` as `Left` upon failure.
-  def credit(amount: BigDecimal): Either[TransferError, Unit] = ???
+  def credit(amount: BigDecimal): Either[TransferError, Unit] = {
+    if (amount < 0) Left(NegativeAmount)
+    if (amount == 0) Left(ZeroAmount)
+    if (amount > 1000000) Left(AmountIsTooLarge)
+    if (amount.precision > 2)Left(TooManyDecimals)
+    else Right()
+  }
+
+  // Example usage
+  credit(12.32).left.map {
+    case TransferError.NegativeAmount => println("Negative amount")
+    case TransferError.ZeroAmount => println("Zero amount")
+    case TransferError.AmountIsTooLarge => println("Amount is to large")
+    case TransferError.TooManyDecimals => println("To many decimals")
+  }
 
   // `Either[Throwable, A]` is similar to `Try[A]`. However, because `Try[A]` has its error channel hardcoded
   // to a specific type and `Either[L, R]` does not, `Try[A]` provides more specific methods to deal with
@@ -163,7 +184,16 @@ object ErrorHandling extends App {
     // Exercise. Implement `validateAge` method, so that it returns `AgeIsNotNumeric` if the age string is not
     // a number and `AgeIsOutOfBounds` if the age is not between 18 and 75. Otherwise the age should be
     // considered valid and returned inside `AllErrorsOr`.
-    private def validateAge(age: String): AllErrorsOr[Int] = ???
+    private def validateAge(age: String): AllErrorsOr[Int] = {
+      def validateNumber: AllErrorsOr[Int] =
+        age.toIntOption.toValidNec(AgeIsNotNumeric)
+
+      def validateBound(age: Int): AllErrorsOr[Int] =
+        if (age < 18 && age > 75) AgeIsOutOfBounds.invalidNec
+        else age.validNec
+
+      validateNumber andThen validateBound
+    }
 
     // `validate` method takes raw username and age values (for example, as received via POST request),
     // validates them, transforms as needed and returns `AllErrorsOr[Student]` as a result. `mapN` method
