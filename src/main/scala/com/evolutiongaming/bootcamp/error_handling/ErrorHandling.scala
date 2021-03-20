@@ -1,5 +1,7 @@
 package com.evolutiongaming.bootcamp.error_handling
 
+import com.evolutiongaming.bootcamp.error_handling.ErrorHandling.TransferError.{AmountIsTooLarge, NegativeAmount, TooManyDecimals, ZeroAmount}
+
 import scala.concurrent.Future
 import scala.util.{Success, Try}
 import scala.util.control.NonFatal
@@ -56,7 +58,10 @@ object ErrorHandling extends App {
   // can go wrong or there is no interest in a particular reason for a failure.
 
   // Exercise. Implement `parseIntOption` method.
-  def parseIntOption(string: String): Option[Int] = ???
+  def parseIntOption(string: String): Option[Int] =
+    string.toIntOption
+    //Try(Integer.parseInt(string)).toOption
+    //Option(Integer.parseInt(string)) -- my solution
 
   // The downside of Option is that it does not encode any information about what exactly went wrong. It only
   // states the mere fact that it did.
@@ -70,7 +75,8 @@ object ErrorHandling extends App {
 
   // Exercise. Implement `parseIntEither` method, returning the parsed integer as `Right` upon success and
   // "{{string}} does not contain an integer" as `Left` upon failure.
-  def parseIntEither(string: String): Either[String, Int] = ???
+  def parseIntEither(string: String): Either[String, Int] =
+    Try(Integer.parseInt(string)).toEither.left.map(_.getMessage)
 
   // As an alternative to `String`, a proper ADT can be introduced to formalize all error cases. As discussed
   // in `AlgebraicDataTypes` section, this provides a number of benefits, including an exhaustiveness check
@@ -78,19 +84,40 @@ object ErrorHandling extends App {
   //
   // Note that this is a superficial example. Always think how detailed you want your error cases to be.
   sealed trait TransferError
+
   object TransferError {
+
     /** Returned when amount to credit is negative. */
     final case object NegativeAmount extends TransferError
+
     /** Returned when amount to credit is zero. */
     final case object ZeroAmount extends TransferError
+
     /** Returned when amount to credit is equal or greater than 1 000 000. */
     final case object AmountIsTooLarge extends TransferError
+
     /** Returned when amount to credit is within the valid range, but has more than 2 decimal places. */
     final case object TooManyDecimals extends TransferError
+
   }
+
   // Exercise. Implement `credit` method, returning `Unit` as `Right` upon success and the appropriate
   // `TransferError` as `Left` upon failure.
-  def credit(amount: BigDecimal): Either[TransferError, Unit] = ???
+  def credit(amount: BigDecimal): Either[TransferError, Unit] = {
+    if (amount < 0) Left(NegativeAmount)
+    if (amount == 0) Left(ZeroAmount)
+    if (amount > 1000000) Left(AmountIsTooLarge)
+    if (amount.precision > 2) Left(TooManyDecimals)
+    else Right()
+  }
+
+  // Example usage
+  credit(12.32).left.map {
+    case TransferError.NegativeAmount => println("Negative amount")
+    case TransferError.ZeroAmount => println("Zero amount")
+    case TransferError.AmountIsTooLarge => println("Amount is to large")
+    case TransferError.TooManyDecimals => println("To many decimals")
+  }
 
   // `Either[Throwable, A]` is similar to `Try[A]`. However, because `Try[A]` has its error channel hardcoded
   // to a specific type and `Either[L, R]` does not, `Try[A]` provides more specific methods to deal with
@@ -113,23 +140,30 @@ object ErrorHandling extends App {
   final case class Student(username: String, age: Int)
 
   sealed trait ValidationError
+
   object ValidationError {
+
     final case object UsernameLengthIsInvalid extends ValidationError {
       override def toString: String = "Username must be between 3 and 30 characters"
     }
+
     final case object UsernameHasSpecialCharacters extends ValidationError {
       override def toString: String = "Username cannot contain special characters"
     }
+
     final case object AgeIsNotNumeric extends ValidationError {
       override def toString: String = "Age must be a number"
     }
+
     final case object AgeIsOutOfBounds extends ValidationError {
       override def toString: String = "Student must be of age 18 to 75"
     }
+
   }
 
   // There is a separate lecture about Cats library, so we will not go into details here. Suffice to say
   // we need few imports to bring the power of Cats to work with Validated data type.
+
   import cats.data.ValidatedNec
   import cats.syntax.all._
 
@@ -181,6 +215,19 @@ object ErrorHandling extends App {
       a andThen b
     }
 
+    // TODO: lecturer solutions
+
+    //    private def validateAge(age: String): AllErrorsOr[Int] = {
+    //      def validateNumber: AllErrorsOr[Int] =
+    //        age.toIntOption.toValidNec(AgeIsNotNumeric)
+    //
+    //      def validateBound(age: Int): AllErrorsOr[Int] =
+    //        if (age < 18 && age > 75) AgeIsOutOfBounds.invalidNec
+    //        else age.validNec
+    //
+    //      validateNumber andThen validateBound
+    //    }
+
     // `validate` method takes raw username and age values (for example, as received via POST request),
     // validates them, transforms as needed and returns `AllErrorsOr[Student]` as a result. `mapN` method
     // allows to map other N Validated instances at the same time.
@@ -196,6 +243,7 @@ object ErrorHandling extends App {
   // fulfilled. This is a trivial example, but imagine a more obscure one. Sooner or later this method will
   // throw an exception instead of returning JSON. The caller may no be prepared for that.
   type Json = Any
+
   def parseJson(string: String): Json = ???
 
   // Good! The caller can immediately see we do not guarantee a JSON object for every string. Moreover, this
@@ -245,6 +293,7 @@ object ErrorHandling extends App {
     case class PaymentCard(/* Add parameters as needed */)
 
     sealed trait ValidationError
+
     object ValidationError {
       ??? // Add errors as needed
     }
@@ -260,6 +309,7 @@ object ErrorHandling extends App {
         securityCode: String,
       ): AllErrorsOr[PaymentCard] = ???
     }
+
   }
 
   // Attributions and useful links:
