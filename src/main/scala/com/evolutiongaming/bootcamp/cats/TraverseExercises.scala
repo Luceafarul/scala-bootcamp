@@ -35,6 +35,7 @@ object TraverseExercises extends App {
   List(Future(2), Future.failed(exception)).sequence == Future.failed(exception)
 
   List(2, 3).traverse(k => Future(k + 1)) == Future(List(3, 4))
+  List(2, 3).map(k => Future(k + 1)).sequence == Future(List(3, 4))
 
 
   // API
@@ -49,13 +50,13 @@ object TraverseExercises extends App {
 
   // Task
   val users: List[Option[User]] = ids.map(id => getUser(id))
-  val users2: List[User] = ???
+  val users2: List[User] = users.flatten
 
   val usersAsync: List[IO[Option[User]]] = ids.map(id => getUserAsync(id))
-  val usersAsync2: IO[List[User]] = ???
+  val usersAsync2: IO[List[User]] = ids.traverseFilter(getUserAsync)
 
   val usersFriendsAsync: List[IO[Option[List[UserId]]]] = ids.map(id => getUserAsync(id).map(_.map(_.friends)))
-  val usersFriendsAsync2: IO[List[UserId]] = ???
+  val usersFriendsAsync2: IO[List[UserId]] = ??? //ids.traverseFilter(getUserAsync)
 
   // advanced
   val usersFriendsFriendsAsync: List[IO[Option[List[IO[Option[User]]]]]] = ids.map(id => getUserAsync(id).map(_.map(_.friends.map(id => getUserAsync(id)))))

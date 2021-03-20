@@ -11,6 +11,7 @@ import scala.io.StdIn
 
 final case class Item(id: Long, name: String, price: BigDecimal)
 
+// Items repository
 trait Items[F[_]] {
   def all: F[Map[Long, Item]]
   def create(name: String, price: BigDecimal): F[Either[ValidationError, Item]]

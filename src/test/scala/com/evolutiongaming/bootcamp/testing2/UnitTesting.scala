@@ -221,6 +221,21 @@ class Exercise2Spec extends AnyFreeSpec {
 // sbt:scala-bootcamp> testOnly *testing2.Exercise3Spec
 //
 class Exercise3Spec extends AnyWordSpec {
+  "The calculator" should {
+    "enter the number correctly" in {
+      val calculator = Calculator()
+      assert(calculator.enter(1) == Right(Calculator(1, 0, None)))
+      assert(calculator.enter(7) == Right(Calculator(7, 0, None)))
+      assert(calculator.enter(12) == Left("digit out of range"))
+    }
+
+    "does nothing" when {
+      "when you just repeat pressing `=`" in {
+        val calculator = Calculator()
+        assert(calculator.calculate.calculate.calculate.calculate == calculator)
+      }
+    }
+  }
 }
 
 // *Note*
@@ -251,14 +266,14 @@ class Exercise4Spec extends AnyFreeSpec with Matchers {
   "calculator" - {
     "enters the number correctly" in {
       val calculator = Calculator()
-      calculator.enter(1) should be (Right(Calculator(1, 0, None)))
-      assert(calculator.enter(7) == Right(Calculator(7, 0, None)))
-      assert(calculator.enter(12) == Left("digit out of range"))
+      calculator.enter(1) shouldBe Right(Calculator(1, 0, None))
+      calculator.enter(7) shouldBe Right(Calculator(7, 0, None))
+      calculator.enter(12) shouldBe Left("digit out of range")
     }
     "does nothing" - {
       "when you just repeat pressing `=`" in {
         val calculator = Calculator()
-        assert(calculator.calculate.calculate.calculate.calculate == calculator)
+        calculator.calculate.calculate.calculate.calculate shouldBe calculator
       }
     }
   }
@@ -291,8 +306,8 @@ class Exercise5Spec extends AnyFreeSpec with EitherValues {
     "enters the number correctly" in {
       val calculator = Calculator()
       assert(calculator.enter(1).right.value == Calculator(1, 0, None))
-      assert(calculator.enter(7) == Right(Calculator(7, 0, None)))
-      assert(calculator.enter(12) == Left("digit out of range"))
+      assert(calculator.enter(7).right.value == Calculator(7, 0, None))
+      assert(calculator.enter(12).left.value == "digit out of range")
     }
     "does nothing" - {
       "when you just repeat pressing `=`" in {
@@ -369,7 +384,7 @@ class Exercise6Spec extends AnyFunSuite {
 class Exercise7Spec extends AnyFunSuite {
 
   test("HAL 9000 multiplies numbers correctly") {
-    // assert(HAL9000.twice(7) == 14)
+     assert(HAL9000.twice(7) == 14)
   }
 
 }
@@ -389,6 +404,9 @@ class Exercise7Spec extends AnyFunSuite {
 class Exercise8Spec extends AnyFunSuite {
 
   test("HAL 9000 behaves as expected when asked to open the door") {
+    assertThrows[RuntimeException] {
+      HAL9000.letAustronautIn()
+    }
   }
 
 }
@@ -410,7 +428,7 @@ class Exercise8Spec extends AnyFunSuite {
 class Exercise9Spec extends AnyFunSuite {
 
   test("HAL9000") {
-    assert(HAL9000.register1 == HAL9000.register2)
+    assert(HAL9000.register1 == HAL9000.register2, "wrong registers")
   }
 
 }
@@ -463,8 +481,12 @@ object Exercise10 {
     def apply(repository: PlayerRepository, logging: Logging): PlayerService = new PlayerService {
 
       // NOTE: We do not have a returned type annotation and documentation here, why?
-      def deleteWorst(minimumScore: Int) = ???
-      def celebrate(bonus: Int) = ???
+      def deleteWorst(minimumScore: Int) = {
+        repository.all.filterNot(_.score > minimumScore).foreach(p => repository.delete(p.id))
+      }
+      def celebrate(bonus: Int) = repository.all.foreach { p =>
+        repository.update(p.copy(score = p.score + bonus))
+      }
 
     }
 
@@ -504,32 +526,56 @@ class Exercise10Spec extends AnyFunSuite {
 
   import Exercise10._
 
+  class Fixture {
+    val repository = new PlayerRepository {
+      private val players = collection.mutable.ArrayBuffer.empty[Player]
+
+      players.addAll(Seq(
+        Player("1", "Antony", "a@test.mail", 70),
+        Player("2", "Marcus", "m@test.mail", 80),
+        Player("3", "Vanessa", "v@test.mail", 90)
+      ))
+
+      override def byId(id: String): Option[Player] = players.find(_.id == id)
+
+      override def all: List[Player] = players.toList
+
+      override def update(player: Player): Unit = {
+        delete(player.id)
+        players += player
+      }
+
+      override def delete(id: String): Unit = byId(id).map(player => players -= player)
+    }
+    val logging = new Logging {
+      override def info(message: String): Unit = println(s"[LOG]: $message")
+    }
+    val service = PlayerService(repository, logging)
+  }
+
   test("PlayerService.deleteWorst works correctly") {
 
     // construct fixture
-    val repository = ???
-    val logging = ???
-    val service = PlayerService(repository, logging)
+    val fixture = new Fixture
 
     // perform the test
-    service.deleteWorst(???)
+    fixture.service.deleteWorst(73)
 
     // validate the results
-    assert(???)
+    assert(fixture.repository.all.size == 2)
+    assert(fixture.repository.all.forall(_.score > 73))
   }
 
   test("PlayerService.celebrate works correctly") {
 
     // construct fixture
-    val repository = ???
-    val logging = ???
-    val service = PlayerService(repository, logging)
+    val fixture = new Fixture
 
     // perform the test
-    service.celebrate(???)
+    fixture.service.celebrate(10)
 
     // validate the results
-    assert(???)
+    assert(fixture.repository.all.map(_.score) == List(80, 90, 100))
   }
 
 }

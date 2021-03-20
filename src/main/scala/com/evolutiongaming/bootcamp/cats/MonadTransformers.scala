@@ -24,13 +24,27 @@ object For {
 
   class Task1(repo: Repository) {
     // find all friends for users passed
-    def friends(users: List[UserId]): Either[Error, List[UserId]] = ???
+    def friends(users: List[UserId]): Either[Error, List[UserId]] =
+      users.traverse(repo.getFriends).map(_.flatten)
   }
 
   // implement
   class Service(repo: Repository) {
 
-    def friendsOrders(userId: UserId): Either[Error, List[Item]] = ???
+    def friendsOrders(userId: UserId): Either[Error, List[Item]] =
+      for {
+        friends <- repo.getFriends(userId)
+        orders <- friends.traverse(repo.getOrder)
+        items <- orders.traverse(repo.getItems)
+      } yield items.flatten
+
+    // TODO flatMap solution, less readable then for-solution
+
+    //      repo.getFriends(userId)
+    //        .flatMap(users =>
+    //          users.traverse(id => repo.getOrder(id))
+    //            .flatMap(orders => orders.traverse(order => repo.getItems(order)))
+    //        ).map(_.flatten)
   }
 
 }
@@ -56,7 +70,15 @@ object MonadTransformers {
   // implement
   class Service(repo: Repository) {
 
-    def friendsOrders(userId: UserId): IO[Either[Error, List[Item]]] = ???
+    def friendsOrders(userId: UserId): IO[Either[Error, List[Item]]] = {
+      val result = for {
+        friends <- EitherT(repo.getFriends(userId))
+        orders <- friends.map(friend => EitherT(repo.getOrder(friend))).sequence
+        items <- orders.map(order => EitherT(repo.getItems(order))).sequence
+      } yield items.flatten
+
+      result.value
+    }
   }
 
 }
@@ -84,9 +106,9 @@ object Generic {
     def friendsOrders(userId: UserId): F[List[Item]] = ???
   }
 
-//  new Repository of IO
-//  new Repository of Either
-//  new Repository of EitherT
-//  new Repository of IO Either
+  //  new Repository of IO
+  //  new Repository of Either
+  //  new Repository of EitherT
+  //  new Repository of IO Either
 
 }

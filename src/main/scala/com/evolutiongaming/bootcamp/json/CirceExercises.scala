@@ -47,7 +47,20 @@ object CirceExercises {
       "isRatedR" true
     }
     */
-    lazy val jMatrix: Json = ???
+    lazy val jMatrix: Json = Json.obj(
+      "title" -> Json.fromString("The Matrix"),
+      "year" -> Json.fromInt(1999),
+      "actors" -> Json.arr(
+        Json.fromString("Keanu Reeves"),
+        Json.fromString("Carrie-Anne Moss"),
+        Json.fromString("Laurence Fishburne")
+      ),
+      //      "actors" -> Json.arr(
+      //        Array("Keanu Reeves", "Carrie-Anne Moss", "Laurence Fishburne")
+      //          .map(Json.fromString): _*
+      //      ),
+      "isRatedR" -> Json.fromBoolean(true)
+    )
 
     /* Parsing */
     val twinPeaksRawJson: String =
@@ -98,11 +111,19 @@ object CirceExercises {
         |  }
         |}
         |""".stripMargin
-    lazy val killersOnTourJson: Json = ???
+    lazy val killersOnTourJson: Json = parse(killersRawJson)
+      .getOrElse(null)
+      .hcursor
+      .downField("artist")
+      .downField("ontour")
+      .withFocus(_.mapBoolean(_ => true))
+      .top
+      .getOrElse(Json.Null)
   }
 
   /* Optics */
   object optics {
+
     import io.circe.optics.JsonPath._
     import monocle.Optional
     import basics.{killersRawJson, twinPeaksParsed}
@@ -117,7 +138,8 @@ object CirceExercises {
     val oldGoodTwinPeaks: Json = _oldGoodTwinPeaks(twinPeaksParsed)
 
     /* Exercise 3: same as 2, but using optics */
-    lazy val killersOnTourJson: Json = ???
+    val _onTour: Json => Json = root.artist.ontour.boolean.modify(_ => true)
+    lazy val killersOnTourJson: Json = _onTour(parsedKillersJson)
   }
 
   /* Encoding/decoding, part I */
@@ -133,6 +155,7 @@ object CirceExercises {
   )
 
   object semiauto {
+
     import io.circe.generic.semiauto._
 
     implicit val gigDecoder: Decoder[Gig] = deriveDecoder[Gig]
@@ -143,6 +166,7 @@ object CirceExercises {
     val decodedGig: Either[Error, Gig] = decode(gigJson.noSpaces)
 
     @JsonCodec final case class Song(title: String, lengthInSec: Int)
+
     val song: Song = Song("Crystal", 259)
     val songJson: Json = song.asJson
 
@@ -156,21 +180,46 @@ object CirceExercises {
 
       What will happen if you comment codecs for `Song`?
     */
-    lazy val albumJson: Json = ???
+    @JsonCodec final case class Album(title: String, year: Int, songs: Seq[Song])
+
+    val nevermind: Album = Album(
+      "Nevermind",
+      1991,
+      Seq(
+        Song("Smells Like Teen Spirit", 301),
+        Song("In Bloom", 251),
+        Song("Come as You Are", 219),
+        Song("Breed", 183),
+        Song("Lithium", 257),
+        Song("Polly", 177),
+        Song("Territorial Pissings", 142),
+        Song("Drain You", 223),
+        Song("Lounge Act", 156),
+        Song("Stay Away", 212),
+        Song("On a Plain", 196),
+        Song("Something in the Way", 232),
+        Song("Endless, Nameless", 404)
+      )
+    )
+    lazy val albumJson: Json = nevermind.asJson
   }
 
   /* Encoding/decoding, part II */
   object auto {
+
     import io.circe.generic.auto._
 
     final case class Song(title: String, length: Int)
+
     private val song = Song("Crystal", 249)
     val songJson: Json = song.asJson
     val decodedSong: Either[Error, Song] = decode[Song](songJson.noSpaces)
   }
 
   object manual {
+
     final case class Song(title: String, length: Int)
+
     private val song = Song("Crystal", 249)
 
     implicit val songDecoder: Decoder[Song] =
@@ -194,6 +243,7 @@ object CirceExercises {
     }
 
     @JsonCodec final case class TimeWindow(before: Instant, after: Instant)
+
     val timeWindow: TimeWindow = TimeWindow(
       before = Instant.now,
       after = Instant.now.plusSeconds(5L)
@@ -206,17 +256,20 @@ object CirceExercises {
   }
 
   object snake_case {
+
     import io.circe.generic.extras._
     import custom1.{encodeYear, decodeYear}
 
     implicit val config: Configuration = Configuration.default.withSnakeCaseMemberNames
 
     @ConfiguredJsonCodec final case class Movie(title: String, year: Year, isRatedR: Boolean)
+
     val dieHard: Movie = Movie("Die Hard", Year.of(1988), isRatedR = true)
     lazy val dieHardJson: Json = dieHard.asJson // {"title":"Die Hard","year":1988,"is_rated_r":true}
   }
 
   object adt {
+
     import io.circe.generic.extras._
     import io.circe.generic.extras.semiauto._
 
@@ -228,8 +281,11 @@ object CirceExercises {
     val hhJson: Json = `hip-hop`.asJson
 
     sealed trait Video
+
     final case class Movie(rating: Double) extends Video
+
     final case class Youtube(views: Long) extends Video
+
     implicit val movieDecoder: Decoder[Movie] = deriveConfiguredDecoder[Movie]
     implicit val movieEncoder: Encoder[Movie] = deriveConfiguredEncoder[Movie]
     implicit val ytDecoder: Decoder[Youtube] = deriveConfiguredDecoder[Youtube]

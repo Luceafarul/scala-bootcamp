@@ -1,6 +1,7 @@
 package com.evolutiongaming.bootcamp.error_handling
 
 import scala.concurrent.Future
+import scala.util.{Success, Try}
 import scala.util.control.NonFatal
 
 object ErrorHandling extends App {
@@ -163,7 +164,22 @@ object ErrorHandling extends App {
     // Exercise. Implement `validateAge` method, so that it returns `AgeIsNotNumeric` if the age string is not
     // a number and `AgeIsOutOfBounds` if the age is not between 18 and 75. Otherwise the age should be
     // considered valid and returned inside `AllErrorsOr`.
-    private def validateAge(age: String): AllErrorsOr[Int] = ???
+    private def validateAge(age: String): AllErrorsOr[Int] = {
+      def a: AllErrorsOr[Int] = {
+        // TODO how to remove match?
+        Try(Integer.parseInt(age)).toOption match {
+          case Some(value) => value.validNec
+          case None => AgeIsNotNumeric.invalidNec
+        }
+      }
+
+      def b(age: Int): AllErrorsOr[Int] = {
+        if (age > 18 && age < 75) age.validNec
+        else AgeIsOutOfBounds.invalidNec
+      }
+
+      a andThen b
+    }
 
     // `validate` method takes raw username and age values (for example, as received via POST request),
     // validates them, transforms as needed and returns `AllErrorsOr[Student]` as a result. `mapN` method
