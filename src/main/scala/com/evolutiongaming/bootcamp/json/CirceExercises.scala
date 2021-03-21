@@ -63,16 +63,22 @@ object CirceExercises {
     )
 
     /* Parsing */
+    // Method parse(...) return Either[ParsingFailure, Json]
+    // we getOrElse(Json.Null) and then apply method .hcursor for Json result
+    // hcursor return cursor that point for json root
+    // then apply .downField("ratings") for move to "ratings" field
+    // then .downN(3) for get 3th element in array
+    // but we get exception, because arrays start from 0
     val twinPeaksRawJson: String =
-      """
-        |{
-        |  "show": "Twin Peaks",
-        |  "ratings": [
-        |    { "season": 1, "metaScore": 96 },
-        |    { "season": 2, "metaScore": 95 },
-        |    { "season": 3, "metaScore": 74 }
-        |  ]
-        |}""".stripMargin
+    """
+      |{
+      |  "show": "Twin Peaks",
+      |  "ratings": [
+      |    { "season": 1, "metaScore": 96 },
+      |    { "season": 2, "metaScore": 95 },
+      |    { "season": 3, "metaScore": 74 }
+      |  ]
+      |}""".stripMargin
     val twinPeaksParsed: Json =
       parse(twinPeaksRawJson).getOrElse(Json.Null)
     val tpCursor: HCursor = twinPeaksParsed.hcursor
@@ -80,9 +86,18 @@ object CirceExercises {
       tpCursor.downField("ratings").downN(3).get[Int]("metaScore")
 
     /* Transform */
+    // Allow change jsons
+    // Using tpCursor and apply method .downField("show") we move to "show" field
+    // then apply method .withFocus(json => json.mapString(show => "Old good " + show))
+    // we get json field, mapString with append "Old good " to our show name
+    // then we go to .field("ratings")
+    // and change "ratings" with .withFocus(json => json.mapArray(arr => arr.init))
+    // removed last element
+    // then apply top method for return to root of our json
     val oldGoodTwinPeaks: Json = tpCursor
       .downField("show")
       .withFocus(_.mapString("Old good " + _))
+      // .withFocus(json => json.mapString(show => "Old good " + show))
       .field("ratings")
       .withFocus(_.mapArray(_.init))
       .top
