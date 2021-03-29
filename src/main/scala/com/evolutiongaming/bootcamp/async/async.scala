@@ -1,12 +1,16 @@
 package com.evolutiongaming.bootcamp.async
 
-import java.util.concurrent.atomic.AtomicInteger
-
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future, Promise}
 import scala.util.{Failure, Success}
 
 object Threads extends App {
+  // 1. Create thread
+  // 2. Override run method
+  // 3. start() thread
+  // start() vs join() ???
   new Thread(() => {
     println("Doing very parallel things")
   }).start()
@@ -25,8 +29,14 @@ object Threads extends App {
 }
 
 object BasicFutures extends App {
+  val threadPool = Executors.newFixedThreadPool(10)
+  implicit val executionContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
+
+  // What is that?
+
   import scala.concurrent.ExecutionContext.Implicits.global
 
+  // Why Future { 42 } is more "heavy" then Future.successful(42) ???
   val completedFuture: Future[Int] = Future.successful(42) //doesn't schedule work
   completedFuture.foreach(println)
 
@@ -41,8 +51,16 @@ object BasicFutures extends App {
     "work done!"
   }
   futureFromBlock.onComplete {
-    case Success(value) => println(value)
-    case Failure(t)     => t.printStackTrace()
+    case Success(value) => println(s"1 - $value")
+    case Failure(t) => t.printStackTrace()
+  }
+  futureFromBlock.onComplete {
+    case Success(value) => println(s"2 - $value")
+    case Failure(t) => t.printStackTrace()
+  }
+  futureFromBlock.onComplete {
+    case Success(value) => println(s"3 - $value")
+    case Failure(t) => t.printStackTrace()
   }
 }
 
@@ -53,7 +71,7 @@ object FutureFromPromise extends App {
     future.onComplete {
       case Success(value) =>
         promise.success(value + 1) //can be called only once
-      case Failure(t)     =>
+      case Failure(t) =>
         promise.failure(t) //can be called only once
     } //can be replaced with promise.complete(result: Try[T])
     //promise can be completed only once!
@@ -69,6 +87,8 @@ object FutureFromPromise extends App {
     }
 
     asyncInc(future).foreach(println)
+
+    // If nothing printed, use Thread.sleep(2000)
   }
 }
 
@@ -85,7 +105,28 @@ object FutureFromPromise extends App {
   Add implicit args to the function if needed!
    */
 object Exercise1 extends App {
-  def firstCompleted[T](f1: Future[T], f2: Future[T])(implicit ec: ExecutionContext): Future[T] = ???
+  def firstCompleted[T](f1: Future[T], f2: Future[T])(implicit ec: ExecutionContext): Future[T] = {
+    val promise = Promise[T]()
+
+    //    f1.onComplete {
+    //      case Success(value) => promise.success(value)
+    //      case Failure(exception) => promise.failure(exception)
+    //    }
+    //
+    //    f2.onComplete {
+    //      case Success(value) => promise.success(value)
+    //      case Failure(exception) => promise.failure(exception)
+    //    }
+
+    List(f1, f2).foreach {
+      _.onComplete {
+        case Success(value) => promise.success(value)
+        case Failure(exception) => promise.failure(exception)
+      }
+    }
+
+    promise.future
+  }
 
   {
     import scala.concurrent.ExecutionContext.Implicits.global
@@ -128,7 +169,12 @@ Implement sumAll using collection foldLeft and map + flatMap on Future's (or for
 If called on an empty collection, should return Future.successful(0).
  */
 object Exercise2 extends App {
-  def sumAll(futureValues: Seq[Future[Int]])(implicit ec: ExecutionContext): Future[Int] = ???
+  def sumAll(futureValues: Seq[Future[Int]])(implicit ec: ExecutionContext): Future[Int] = {
+    if (futureValues.isEmpty) Future.successful(0)
+    else futureValues.foldLeft(Future.successful(0)) { (acc, future) =>
+      future.flatMap { i => acc.map { a => a + i } }
+    }
+  }
 
   {
     import scala.concurrent.ExecutionContext.Implicits.global
@@ -139,9 +185,26 @@ object Exercise2 extends App {
 }
 
 object FutureShenanigans {
+
   import scala.concurrent.ExecutionContext.Implicits.global
   //parallel or in sequence?
 
+  val testFuture: Future[Int] = Future {
+    println("I'm side effect!")
+    73
+  }
+
+  // Execute sequentially
+  for {
+    a <- Future {
+      123
+    }
+    b <- Future {
+      321
+    }
+  } yield a + b
+
+  // Execute parallel
   def example1(f1: Future[Int], f2: Future[Int]): Future[Int] = {
     for {
       result1 <- f1
@@ -149,6 +212,7 @@ object FutureShenanigans {
     } yield result1 + result2
   }
 
+  // Execute sequentially
   def example2(f1: => Future[Int], f2: => Future[Int]): Future[Int] = {
     for {
       result1 <- f1
@@ -158,6 +222,7 @@ object FutureShenanigans {
 }
 
 object SharedStateProblems extends App {
+
   import scala.concurrent.ExecutionContext.Implicits.global
 
   var counter: Int = 0
@@ -165,15 +230,19 @@ object SharedStateProblems extends App {
   val thread1 = Future {
     (1 to 1000).foreach(_ => counter += 1)
   }
+
   val thread2 = Future {
     (1 to 1000).foreach(_ => counter += 1)
   }
+
   Await.ready(thread1, 5.seconds)
   Await.ready(thread2, 5.seconds)
+
   println(counter)
 }
 
 object SharedStateSynchronized extends App {
+
   import scala.concurrent.ExecutionContext.Implicits.global
 
   //all variables which are read and written by multiple threads should be declared as volatile
@@ -187,15 +256,18 @@ object SharedStateSynchronized extends App {
   val thread1 = Future {
     (1 to 1000).foreach(_ => threadSafeInc())
   }
+
   val thread2 = Future {
     (1 to 1000).foreach(_ => threadSafeInc())
   }
+
   Await.ready(thread1, 5.seconds)
   Await.ready(thread2, 5.seconds)
   println(counter)
 }
 
 object SynchronizedDeadlock extends App {
+
   import scala.concurrent.ExecutionContext.Implicits.global
 
   val resource1 = new Object()
@@ -226,8 +298,10 @@ object SynchronizedDeadlock extends App {
 }
 
 object SharedStateAtomic extends App {
+
   import scala.concurrent.ExecutionContext.Implicits.global
 
+  // Compare and swap
   val counter: AtomicInteger = new AtomicInteger(0)
 
   val thread1 = Future {
@@ -245,7 +319,9 @@ object SharedStateAtomic extends App {
 Make this work correctly a) first with synchronized blocks, b) then with AtomicReference
  */
 object Exercise3 extends App {
+
   import scala.concurrent.ExecutionContext.Implicits.global
+
   val tasksCount = 100
   val taskIterations = 1000
   val initialBalance = 10
@@ -256,14 +332,14 @@ object Exercise3 extends App {
   var balance2: Int = initialBalance
 
   def doTaskIteration(): Unit = {
-    val State(newBalance1, newBalance2) = transfer(State(balance1, balance2))
-    balance1 = newBalance1
-    balance2 = newBalance2
+    val atomicStateRef = new AtomicReference[State](State(balance1, balance2))
+    atomicStateRef.updateAndGet(transfer)
   }
 
   def printBalancesSum(): Unit = {
     println(balance1 + balance2)
   }
+
   //PLACE TO FIX - FINISH
 
 
@@ -284,12 +360,44 @@ object Exercise3 extends App {
   printBalancesSum() //should print 20
 
   final case class State(balance1: Int, balance2: Int)
+
+}
+
+object DeadLock extends App {
+
+  import scala.concurrent.ExecutionContext.Implicits.global
+  import scala.concurrent._
+  import scala.concurrent.duration._
+
+  object A {
+    lazy val base = 42
+    lazy val start: Int = B.step
+  }
+
+  object B {
+    lazy val step: Int = A.base
+  }
+
+  object Scenario2 {
+    def run: Seq[Int] = {
+      val result = Future.sequence(Seq(
+        Future {
+          A.start
+        }, // (1)
+        Future {
+          B.step
+        } // (2)
+      ))
+      Await.result(result, 1.minute)
+    }
+  }
+
 }
 
 object Singletons extends App {
   /*
-  Properly implementing lazy initialized singletons which correctly work in a multithreading environment
-  is a challenge. Luckily Scala got it for you!
+  Properly implementing lazy initialized singletons which correctly work
+  in a multithreading environment is a challenge. Luckily Scala got it for you!
    */
 
   lazy val immaLazyVal: String = {
