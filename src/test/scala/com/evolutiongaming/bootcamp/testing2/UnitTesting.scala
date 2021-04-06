@@ -4,6 +4,8 @@ import cats.Monad
 import cats.data.State
 import cats.syntax.all._
 import com.evolutiongaming.bootcamp.testing2.hal9000.HAL9000
+import org.mockito.IdiomaticMockito
+
 import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.EitherValues
 import org.scalatest.freespec.AnyFreeSpec
@@ -11,6 +13,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+
 import scala.annotation.nowarn
 import scala.concurrent.Future
 import scala.concurrent.Promise
@@ -207,6 +210,7 @@ class Exercise2Spec extends AnyFreeSpec {
   }
 
 }
+
 // *Exercise 3*
 //
 // Another popular way to write tests is `WordSpec` as it pushes a very strict
@@ -384,7 +388,7 @@ class Exercise6Spec extends AnyFunSuite {
 class Exercise7Spec extends AnyFunSuite {
 
   test("HAL 9000 multiplies numbers correctly") {
-     assert(HAL9000.twice(7) == 14)
+    assert(HAL9000.twice(7) == 14)
   }
 
 }
@@ -450,12 +454,17 @@ class Exercise9Spec extends AnyFunSuite {
 object Exercise10 {
 
   case class Player(id: String, name: String, email: String, score: Int)
+
   trait PlayerRepository {
     def byId(id: String): Option[Player]
+
     def all: List[Player]
+
     def update(player: Player): Unit
+
     def delete(id: String): Unit
   }
+
   trait Logging {
     def info(message: String): Unit
   }
@@ -475,6 +484,7 @@ object Exercise10 {
     def celebrate(bonus: Int): Unit
 
   }
+
   object PlayerService {
 
     /** Creates a new service working with existing repository */
@@ -484,6 +494,7 @@ object Exercise10 {
       def deleteWorst(minimumScore: Int) = {
         repository.all.filterNot(_.score > minimumScore).foreach(p => repository.delete(p.id))
       }
+
       def celebrate(bonus: Int) = repository.all.foreach { p =>
         repository.update(p.copy(score = p.score + bonus))
       }
@@ -493,6 +504,7 @@ object Exercise10 {
   }
 
 }
+
 // As usual, you can run the following test suite using sbt:
 //
 // sbt:scala-bootcamp> testOnly *testing2.Exercise10Spec
@@ -522,20 +534,20 @@ object Exercise10 {
 //
 // Bonus question: do we need to test logging?
 //
-class Exercise10Spec extends AnyFunSuite {
+class Exercise10Spec extends AnyFunSuite with IdiomaticMockito {
 
   import Exercise10._
 
   class Fixture {
-    val repository = new PlayerRepository {
-      private val players = collection.mutable.ArrayBuffer.empty[Player]
+    val players = collection.mutable.ArrayBuffer.empty[Player]
 
-      players.addAll(Seq(
-        Player("1", "Antony", "a@test.mail", 70),
-        Player("2", "Marcus", "m@test.mail", 80),
-        Player("3", "Vanessa", "v@test.mail", 90)
-      ))
+    players.addAll(Seq(
+      Player("1", "Antony", "a@test.mail", 70),
+      Player("2", "Marcus", "m@test.mail", 80),
+      Player("3", "Vanessa", "v@test.mail", 90)
+    ))
 
+    val repositoryOld = new PlayerRepository {
       override def byId(id: String): Option[Player] = players.find(_.id == id)
 
       override def all: List[Player] = players.toList
@@ -547,35 +559,39 @@ class Exercise10Spec extends AnyFunSuite {
 
       override def delete(id: String): Unit = byId(id).map(player => players -= player)
     }
-    val logging = new Logging {
+    val loggingOld = new Logging {
       override def info(message: String): Unit = println(s"[LOG]: $message")
     }
+    val serviceOld = PlayerService(repositoryOld, loggingOld)
+
+    val repository = mock[PlayerRepository]
+    val logging = mock[Logging]
     val service = PlayerService(repository, logging)
   }
 
   test("PlayerService.deleteWorst works correctly") {
-
     // construct fixture
     val fixture = new Fixture
+    fixture.repository.all returns fixture.players.toList
 
     // perform the test
     fixture.service.deleteWorst(73)
 
     // validate the results
-    assert(fixture.repository.all.size == 2)
-    assert(fixture.repository.all.forall(_.score > 73))
+    fixture.repository.delete("1") wasCalled once
   }
 
   test("PlayerService.celebrate works correctly") {
-
+    import org.mockito.ArgumentMatchersSugar._
     // construct fixture
     val fixture = new Fixture
+    fixture.repository.all returns fixture.players.toList
 
     // perform the test
     fixture.service.celebrate(10)
 
     // validate the results
-    assert(fixture.repository.all.map(_.score) == List(80, 90, 100))
+    fixture.repository.update(*) wasCalled threeTimes
   }
 
 }
@@ -609,20 +625,25 @@ object Exercise12 {
   // Combining futures only work if you have implicit execution context in scope.
   // It is not required to combine `IO` objects, and that is one of the reasons
   // to use them instead.
+
   import scala.concurrent.ExecutionContext.Implicits.global
 
   // 1. The type wrapped by `Future` could be changed by using `map`:
   def dogs: Future[Int] = ???
+
   def message1: Future[String] = dogs map { dogs =>
     s"We have $dogs of dogs"
   }
+
   // 2. Two `Future` classes could be combined by `flatMap`:
   def cats: Future[Int] = ???
+
   def message2: Future[String] = dogs flatMap { dogs =>
     cats map { cats =>
       s"We have $dogs of dogs and $cats of cats"
     }
   }
+
   // 3. We can use `for...yield` notation to avoid nesting:
   def message3: Future[String] = for {
     dogs <- dogs
@@ -634,14 +655,19 @@ object Exercise12 {
   //
   // The simplest is just to wrap your code into `Future { ... }`.
   // It will start executing in a different thread as soon as the code is called.
-  def future1: Future[Int] = Future { 7 }
+  def future1: Future[Int] = Future {
+    7
+  }
+
   //
   // Another way is to create it using a `Promise`.
   // It will not start executing anything and will complete when the promise is
   // fulfilled.
   //
   val promise: Promise[Int] = Promise()
+
   def future2: Future[Int] = promise.future
+
   //
   // Now let complete our Future:
   promise.success(7)
@@ -659,12 +685,17 @@ object Exercise12 {
   val list = storage.get()
 
   case class Player(id: String, name: String, email: String, score: Int)
+
   trait PlayerRepository {
     def byId(id: String): Future[Option[Player]]
+
     def all: Future[List[Player]]
+
     def update(player: Player): Future[Unit]
+
     def delete(id: String): Future[Unit]
   }
+
   trait Logging {
     def info(message: String): Future[Unit]
   }
@@ -684,19 +715,28 @@ object Exercise12 {
     def celebrate(bonus: Int): Future[Unit]
 
   }
+
   object PlayerService {
 
     /** Creates a new service working with existing repository */
     def apply(repository: PlayerRepository, logging: Logging): PlayerService = new PlayerService {
 
-      def deleteWorst(minimumScore: Int) = ???
-      def celebrate(bonus: Int) = ???
+      def deleteWorst(minimumScore: Int): Future[Unit] = repository.all.map {
+        players => players.filterNot(_.score > minimumScore).foreach(p => repository.delete(p.id))
+      }
+
+      def celebrate(bonus: Int): Future[Unit] = repository.all.map { players =>
+        players.foreach { p =>
+          repository.update(p.copy(score = p.score + bonus))
+        }
+      }
 
     }
 
   }
 
 }
+
 // ScalaTest supports executing asynchronous code out of the box: just replace
 // `AnyFunSuite` with `AsyncFunSuite` and make sure it returns `Future[Assertion]`:
 // https://www.scalatest.org/user_guide/async_testing
@@ -705,38 +745,71 @@ object Exercise12 {
 //
 class Exercise12Spec extends AsyncFunSuite {
 
+  class Fixture {
+
+    import Exercise12._
+
+    val players = new AtomicReference(
+      List(
+        Player("1", "Antony", "a@test.mail", 70),
+        Player("2", "Marcus", "m@test.mail", 80),
+        Player("3", "Vanessa", "v@test.mail", 90)
+      )
+    )
+
+    val repository = new PlayerRepository {
+      override def byId(id: String): Future[Option[Player]] = Future {
+        players.get().find(_.id == id)
+      }
+
+      override def all: Future[List[Player]] = Future(players.get)
+
+      override def update(player: Player): Future[Unit] = Future {
+        players.getAndUpdate(players => players.map { p => if (p.id == player.id) player else p })
+      }
+
+      override def delete(id: String): Future[Unit] = Future {
+        players.set(players.get.filter(_.id != id))
+      }
+    }
+    val logging = new Logging {
+      override def info(message: String): Future[Unit] = ???
+    }
+    val service = PlayerService(repository, logging)
+  }
+
   import Exercise12._
 
   test("PlayerService.deleteWorst works correctly") {
-
     // construct fixture
-    val repository = ???
-    val logging = ???
-    val service = PlayerService(repository, logging)
+    val fixture = new Fixture
+    import fixture._
 
     // perform the test
-    service.deleteWorst(???) map { _ =>
+    service.deleteWorst(73) map { _ =>
+
       // validate the results
-      assert(???)
+      assert(players.get.size == 2)
+      assert(players.get.forall(_.score > 73))
     }
   }
 
   test("PlayerService.celebrate works correctly") {
-
     // construct fixture
-    val repository = ???
-    val logging = ???
-    val service = PlayerService(repository, logging)
+    val fixture = new Fixture
+    import fixture._
 
     // perform the test
-    service.celebrate(???) map { _ =>
+    service.celebrate(10) map { _ =>
+
       // validate the results
-      assert(???)
+      assert(players.get.map(_.score) == List(80, 90, 100))
     }
 
   }
 
 }
+
 // *Exercise 13*
 //
 // What are main problems of asynchronous testing? Try to name or guess them
@@ -772,6 +845,7 @@ object Exercise14 {
   // Remember Scala allows you to do pass type parameters to function in
   // classes like this?
   def function1[T](list: List[T]): Option[T] = list.headOption
+
   // And then call the function like this?
   val result: Option[Int] = function1(List(1, 2, 3))
 
@@ -782,12 +856,17 @@ object Exercise14 {
   // a higher kinded type (see previous lecture).
   //
   case class Player(id: String, name: String, email: String, score: Int)
+
   trait PlayerRepository[F[_]] {
     def byId(id: String): F[Option[Player]]
+
     def all: F[List[Player]]
+
     def update(player: Player): F[Unit]
+
     def delete(id: String): F[Unit]
   }
+
   trait Logging[F[_]] {
     def info(message: String): F[Unit]
   }
@@ -807,6 +886,7 @@ object Exercise14 {
     def celebrate(bonus: Int): F[Unit]
 
   }
+
   object PlayerService {
 
     // Note: we are using special `Monad` type from `cats` library to avoid some boilerplate.
@@ -815,50 +895,86 @@ object Exercise14 {
     // You will learn more about `cats` library in next lecture.
 
     /** Creates a new service working with existing repository */
-    def apply[F[_]: Monad](repository: PlayerRepository[F], logging: Logging[F]): PlayerService[F] = new PlayerService[F] {
+    def apply[F[_] : Monad](repository: PlayerRepository[F], logging: Logging[F]): PlayerService[F] = new PlayerService[F] {
 
-      def deleteWorst(minimumScore: Int) = ???
-      def celebrate(bonus: Int) = ???
+        def deleteWorst(minimumScore: Int): F[Unit] = repository.all.map {
+          players => players.filterNot(_.score > minimumScore).foreach(p => repository.delete(p.id))
+        }
+
+        def celebrate(bonus: Int): F[Unit] = repository.all.map { players =>
+          players.foreach { p =>
+            repository.update(p.copy(score = p.score + bonus))
+          }
+        }
 
     }
 
   }
 
 }
+
 // Now let's first copy-paste the code form Exercise 12 and replace all
 // `Future` calls by `F` to prove it actually works.
 //
 // sbt:scala-bootcamp> testOnly *testing2.Exercise14FutureSpec
 //
-class Exercise14FutureSpec extends AsyncFunSuite {
+class Exercise14FutureSpec extends AnyFunSuite {
 
-  import Exercise14._
+  class Fixture {
+
+    import Exercise14._
+
+    val players = new AtomicReference(
+      List(
+        Player("1", "Antony", "a@test.mail", 70),
+        Player("2", "Marcus", "m@test.mail", 80),
+        Player("3", "Vanessa", "v@test.mail", 90)
+      )
+    )
+
+    val repository = new PlayerRepository[Option] {
+      override def byId(id: String): Option[Option[Player]] = Option {
+        players.get().find(_.id == id)
+      }
+
+      override def all: Option[List[Player]] = Option(players.get)
+
+      override def update(player: Player): Option[Unit] = Option {
+        players.getAndUpdate(players => players.map { p => if (p.id == player.id) player else p })
+      }
+
+      override def delete(id: String): Option[Unit] = Option {
+        players.set(players.get.filter(_.id != id))
+      }
+    }
+    val logging = new Logging[Option] {
+      override def info(message: String): Option[Unit] = ???
+    }
+    val service = PlayerService(repository, logging)
+  }
 
   test("PlayerService.deleteWorst works correctly") {
-
     // construct fixture
-    val repository = ???
-    val logging = ???
-    val service = PlayerService[Future](repository, logging)
+    val fixture = new Fixture
+    import fixture._
 
     // perform the test
-    service.deleteWorst(???) map { _ =>
+    service.deleteWorst(73) map { _ =>
       // validate the results
-      assert(???)
+      assert(players.get.size == 2)
+      assert(players.get.forall(_.score > 73))
     }
   }
 
   test("PlayerService.celebrate works correctly") {
-
     // construct fixture
-    val repository = ???
-    val logging = ???
-    val service = PlayerService[Future](repository, logging)
+    val fixture = new Fixture
+    import fixture._
 
     // perform the test
-    service.celebrate(???) map { _ =>
+    service.celebrate(10) map { _ =>
       // validate the results
-      assert(???)
+      assert(players.get.map(_.score) == List(80, 90, 100))
     }
 
   }
@@ -907,6 +1023,7 @@ class Exercise14OptionSpec extends AnyFunSuite {
   }
 
 }
+
 //
 // How can we be sure `Future` and `Option` behave the same way?
 //
@@ -955,6 +1072,7 @@ class Exercise14OptionSpec extends AnyFunSuite {
 class Exercise14StateSpec extends AnyFunSuite {
 
   import Exercise14._
+
   type F[T] = State[List[Player], T]
 
   test("PlayerService.deleteWorst works correctly") {
@@ -962,12 +1080,15 @@ class Exercise14StateSpec extends AnyFunSuite {
     // construct fixture
     val repository = new PlayerRepository[F] {
       def byId(id: String) = State.pure(None)
+
       def all = State.get
+
       def update(player: Player) = State.modify { players =>
         players map { p =>
           if (p.id == player) player else p
         }
       }
+
       def delete(id: String) = State.modify { players =>
         players filterNot (_.id == id)
       }

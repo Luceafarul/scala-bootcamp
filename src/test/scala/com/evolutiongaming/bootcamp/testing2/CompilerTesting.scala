@@ -37,17 +37,17 @@ object PowerfulScala {
   //
   // sbt:scala-bootcamp> testOnly *testing2.PowerfulScalaSpec
   //
-  def energy(mass: String): String = {
+  def energy(mass: BigDecimal): BigDecimal = {
     val speedOfLight = BigDecimal(299792458)
-    val energy = BigDecimal(mass) * speedOfLight.pow(2)
-    energy.toString
+    val energy = mass * speedOfLight.pow(2)
+    energy
   }
 
 }
 class PowerfulScalaSpec extends AnyFunSuite {
 
   test("we get a correct result") {
-    assert(PowerfulScala.energy("100") == "8987551787368176400")
+    assert(PowerfulScala.energy(100) == 8987551787368176400L)
   }
   test("wrong call does not compile") {
     assertTypeError("""PowerfulScala.energy("wrong stuff")""")
@@ -96,7 +96,7 @@ object RefinedScala {
   //
   // sbt:scala-bootcamp> testOnly *testing2.RefinedScalaSpec
   //
-  case class Document(url: String, body: String)
+  case class Document(url: String Refined Url, body: String Refined Xml)
 
 }
 class RefinedScalaSpec extends AnyFunSuite {
