@@ -3,15 +3,16 @@ package com.evolutiongaming.bootcamp.effects
 import java.time.Instant
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
-
 import cats.effect.concurrent._
 import cats.effect.{Concurrent, ExitCode, IO, IOApp}
 import cats.implicits.{catsSyntaxMonadErrorRethrow, catsSyntaxParallelSequence}
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import com.evolutiongaming.bootcamp.effects.IosCommon.logger
+import com.evolutiongaming.bootcamp.effects.SynchronizationCommon.Friends
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 
+import scala.annotation.tailrec
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 /*
@@ -65,6 +66,20 @@ object SynchronizationCommon {
   }
 }
 
+object VarFriendsExample {
+
+  class VarFriends extends Friends {
+    private var friendStorage: List[String] = List()
+
+    override def getSize: Int = friendStorage.size
+
+    override def put(s: String): Unit = friendStorage :+= s
+
+    override def getFriendsList: List[String] = friendStorage
+  }
+
+}
+
 /*
  * We can go with `AtomicReference`.
  *
@@ -95,10 +110,13 @@ object AtomicRefSyncExample {
   }
 
   def main(args: Array[String]): Unit = {
+    // Atomic example
     val friends = new AtomicFriends
 
-    run(friends)
+    // Non synchronized example
+    //    val friends = new VarFriendsExample.VarFriends
 
+    run(friends)
   }
 
 }
@@ -141,20 +159,35 @@ object ExerciseZero extends IOApp {
 
   class SimpleRef[A](ar: AtomicReference[A]) extends IOAtomicRef[A] {
 
-    override def get(): IO[A] = ???
+    override def get(): IO[A] = IO(ar.get())
 
-    override def set(a: A): IO[Unit] = ???
+    override def set(a: A): IO[Unit] = IO(ar.set(a))
 
-    override def update(f: A => A): IO[Unit] = ???
+    override def update(f: A => A): IO[Unit] = IO(ar.getAndUpdate(a => f(a)))
 
-    override def modify[B](f: A => (A, B)): IO[B] = ???
+    def updateAsModify(f: A => A): IO[Unit] = modify[Unit](a => (f(a), ()))
+
+    // My implementation
+    // override def modify[B](f: A => (A, B)): IO[B] = IO(f(ar.get()) match { case (_, b) => b })
+
+    override def modify[B](f: A => (A, B)): IO[B] = IO.delay {
+      @tailrec
+      def loop(): B = {
+        val oldValue = ar.get()
+        val (newValue, b) = f(oldValue)
+        if (ar.compareAndSet(oldValue, newValue)) b
+        else loop()
+      }
+
+      loop()
+    }
   }
 
   /*
    * Question : Why we should wrap ref creation in effect ?
    */
   object IOAtomicRef {
-    def of[A](a: A): IO[IOAtomicRef[A]] = ???
+    def of[A](a: A): IO[IOAtomicRef[A]] = IO(new SimpleRef(new AtomicReference[A](a)))
   }
 
   override def run(args: List[String]): IO[ExitCode] = {
@@ -188,10 +221,10 @@ object ExerciseZero extends IOApp {
       _ <- logger.info(s"modify test contentState should be 21, contentState $contentState")
     } yield ()
 
-    //    getTest *>
-    //      setTest *>
-    //      updateTest *>
-    //      modifyTest *>
+        getTest *>
+          setTest *>
+          updateTest *>
+          modifyTest *>
     IO(ExitCode.Success)
   }
 }
@@ -222,8 +255,8 @@ object GetSetExample extends IOApp {
   val program: IO[Unit] = for {
     messages <- Ref[IO].of(List.empty[String])
     _ <- List(report(messages, "one"), report(messages, "two")).parSequence.void
-    msgs <- messages.get
-    _ <- logger.info(s"messages after changes $msgs")
+    message <- messages.get
+    _ <- logger.info(s"messages after changes $message")
   } yield ()
 
   override def run(args: List[String]): IO[ExitCode] = program.as(ExitCode.Success)
@@ -714,9 +747,3 @@ object RaceMVarExercise extends IOApp {
 
   }
 }
-
-
-
-
-
-
