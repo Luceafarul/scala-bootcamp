@@ -1,8 +1,7 @@
 package com.evolutiongaming.bootcamp.http
 
 import java.time.{Instant, LocalDate}
-
-import cats.data.{EitherT, Validated}
+import cats.data.{EitherT, NonEmptyList, Validated}
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import cats.syntax.all._
 import com.evolutiongaming.bootcamp.http.Protocol._
@@ -15,6 +14,7 @@ import org.http4s.implicits._
 import org.http4s.multipart.{Multipart, Part}
 import org.http4s.server.blaze.BlazeServerBuilder
 
+import java.sql.Timestamp
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
@@ -160,6 +160,14 @@ object HttpServer extends IOApp {
     }
     object LocalDateMatcher extends QueryParamDecoderMatcher[LocalDate](name = "date")
 
+    implicit val timestampDecoder: QueryParamDecoder[Instant] = { param =>
+      Validated
+        .catchNonFatal(Instant.parse(param.value))
+        .leftMap(t => ParseFailure(s"Failed to decode Instant", t.getMessage))
+        .toValidatedNel
+    }
+    object TimestampMatcher extends ValidatingQueryParamDecoderMatcher[Instant](name = "timestamp")
+
     HttpRoutes.of[IO] {
 
       // curl "localhost:9001/params/2020-11-10"
@@ -169,6 +177,9 @@ object HttpServer extends IOApp {
       // curl "localhost:9001/params?date=2020-11-10"
       case GET -> Root / "params" :? LocalDateMatcher(localDate) =>
         Ok(s"Matched query param: $localDate")
+
+      case GET -> Root / "params" / "validate" :? TimestampMatcher(timestamp) =>
+        if (timestamp.isValid) Ok(s"Timestamp is valid") else BadRequest("Timestamp is invalid")
 
       // Exercise 1. Implement HTTP endpoint that validates the provided timestamp in ISO-8601 format. If valid,
       // 200 OK status must be returned with "Timestamp is valid" string in the body. If not valid,
@@ -188,6 +199,10 @@ object HttpServer extends IOApp {
     // curl "localhost:9001/headers" -H "Request-Header: Request header value"
     case req @ GET -> Root / "headers" =>
       Ok(s"Received headers: ${ req.headers }", Header("Response-Header", "Response header value"))
+
+    case req @ GET -> Root / "cookies" =>
+      val res = req.cookies.find(_.name == "counter").fold(1)(counter => counter.content.toInt + 1)
+      Ok().map(_.addCookie("counter", res.toString))
 
     // Exercise 2. Implement HTTP endpoint that attempts to read the value of the cookie named "counter". If
     // present and contains an integer value, it should add 1 to the value and request the client to update
@@ -257,7 +272,42 @@ object HttpServer extends IOApp {
     // curl -XPOST "localhost:9001/multipart" -F "character=n" -F file=@text.txt
     case req @ POST -> Root / "multipart" =>
       req.as[Multipart[IO]].flatMap { multipart =>
-        ???
+        // TODO finish own solution
+//        val MULTIPART_SIZE = 2
+//        if (multipart.parts.size != MULTIPART_SIZE) BadRequest()
+//        else {
+//          multipart
+//            .parts
+//            .head
+//            .as[String]
+//            .map(_.length != 1)
+//            .raiseError(throw new IllegalArgumentException("character field should have only one symbol"))
+//
+//          val result = multipart
+//            .parts
+//            .last
+//            .as[String]
+//            .map(_.count(ch => ch == 'n'))
+//
+//          Ok()
+//        }
+
+        // Lector solution
+        val parts = for {
+          characterPart <- multipart.parts.find(_.name.contains("character"))
+          filePart <- multipart.parts.find(_.name.contains("file"))
+        } yield (characterPart.as[String], filePart.as[String]).tupled
+
+        for {
+          count <- parts.sequence.map(_.flatMap {
+            case (character, file) =>
+              Some(character)
+                .filter(_.length == 1)
+                .flatMap(_.headOption)
+                .map(c => file.count(_ == c))
+          })
+          response <- count.fold(BadRequest())(c => Ok(c.toString))
+        } yield response
       }
   }
 
@@ -284,8 +334,10 @@ object HttpClient extends IOApp {
   private def printLine(string: String = ""): IO[Unit] = IO(println(string))
 
   def run(args: List[String]): IO[ExitCode] =
-    BlazeClientBuilder[IO](ExecutionContext.global).resource
-      .parZip(Blocker[IO]).use { case (client, blocker) =>
+    BlazeClientBuilder[IO](ExecutionContext.global)
+      .resource
+      .parZip(Blocker[IO])
+      .use { case (client, blocker) =>
       for {
         _ <- printLine(string = "Executing simple GET and POST requests:")
         _ <- client.expect[String](uri / "hello" / "world") >>= printLine
@@ -295,16 +347,23 @@ object HttpClient extends IOApp {
         _ <- printLine(string = "Executing requests with path and query parameters:")
         _ <- client.expect[String](uri / "params" / "2020-11-10") >>= printLine
         _ <- client.expect[String]((uri / "params").withQueryParam(key = "date", value = "2020-11-10")) >>= printLine
+        _ <- printLine()
 
         // Exercise 4. Call HTTP endpoint, implemented in scope of Exercise 1.
         // curl "localhost:9001/params/validate?timestamp=2020-11-04T14:19:54.736Z"
+        _ <- printLine(string = "Executing requests with path and query parameters and validate:")
+        _ <- client.expect[String]((uri / "params" / "validate").withQueryParam(key = "timestamp", value = "2020-11-04T14:19:54.736Z")) >>= printLine
         _ <- printLine()
 
         _ <- printLine(string = "Executing request with headers and cookies:")
         _ <- client.expect[String](Method.GET(uri / "headers", Header("Request-Header", "Request header value"))) >>= printLine
+        _ <- printLine()
 
         // Exercise 5. Call HTTP endpoint, implemented in scope of Exercise 2.
         // curl -v "localhost:9001/cookies" -b "counter=9"
+        _ <- printLine(string = "Executing request with cookies:")
+        _ <- client.expect[String](Method.GET(uri / "cookies", Cookie(RequestCookie("counter", "6")))) >>= printLine
+        _ <- client.expect[String](Method.GET(uri / "cookies").map(_.addCookie("counter", "6"))) >>= printLine
         _ <- printLine()
 
         _ <- printLine(string = "Executing request with JSON entities:")
