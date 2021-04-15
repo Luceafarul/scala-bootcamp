@@ -1,15 +1,18 @@
 package com.evolutiongaming.bootcamp.http
 
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{ExitCode, IO, IOApp, Resource}
+import cats.syntax.all._
 import fs2.Pipe
 import fs2.concurrent.Queue
 import org.http4s._
+import org.http4s.client.jdkhttpclient.{JdkWSClient, WSConnectionHighLevel, WSFrame, WSRequest}
 import org.http4s.dsl.io._
 import org.http4s.implicits._
 import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.websocket.WebSocketBuilder
 import org.http4s.websocket.WebSocketFrame
 
+import java.net.http.HttpClient
 import scala.concurrent.ExecutionContext
 
 object WebSocketIntroduction {
@@ -79,28 +82,25 @@ object WebSocketServer extends IOApp {
 
 // Regrettably, Http4s does not yet provide a WebSocket client (contributions are welcome!):
 // https://github.com/http4s/http4s/issues/330
+// But there is an Http4s wrapper for builtin JDK HTTP client.
+object WebSocketClient extends IOApp {
+  private val uri = uri"ws://localhost:9002/echo"
 
-// Homework. Place the solution under `http` package in your homework repository.
-//
-// Write a server and a client that play a number guessing game together.
-//
-// Communication flow should be as follows:
-// 1. The client asks the server to start a new game by providing the minimum and the maximum number that can
-//    be guessed, as well as the maximum number of attempts.
-// 2. The server comes up with some random number within the provided range.
-// 3. The client starts guessing the number. Upon each attempt, the server evaluates the guess and responds to
-//    the client, whether the current number is lower, greater or equal to the guessed one.
-// 4. The game ends when the number is guessed or there are no more attempts left. At this point the client
-//    should terminate, while the server may continue running forever.
-// 5. The server should support playing many separate games (with different clients) at the same time.
-//
-// Use HTTP or WebSocket for communication. The exact protocol and message format to use is not specified and
-// should be designed while working on the task.
-object GuessServer {
-  // ...
-}
-object GuessClient {
-  // ...
+  private def printLine(string: String = ""): IO[Unit] = IO(println(string))
+
+  override def run(args: List[String]): IO[ExitCode] = {
+    val clientResource = Resource.eval(IO(HttpClient.newHttpClient()))
+      .flatMap(JdkWSClient[IO](_).connectHighLevel(WSRequest(uri)))
+
+    clientResource.use { client =>
+      for {
+        _ <- client.send(WSFrame.Text("hello"))
+        _ <- client.receiveStream.collectFirst {
+          case WSFrame.Text(s, _) => s
+        }.compile.string >>= printLine
+      } yield ExitCode.Success
+    }
+  }
 }
 
 // Attributions and useful links:
