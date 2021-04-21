@@ -15,7 +15,8 @@ import org.http4s.websocket.WebSocketFrame
 import java.net.http.HttpClient
 import scala.concurrent.ExecutionContext
 import cats.effect.Clock
-import java.time.Instant
+
+import java.time.{Instant, LocalDateTime}
 
 object WebSocketIntroduction {
 
@@ -58,6 +59,14 @@ object WebSocketServer extends IOApp {
           case WebSocketFrame.Text(message, _) => WebSocketFrame.Text(message)
         }
 
+      val currentTimePipe: Pipe[IO, WebSocketFrame, WebSocketFrame] =
+        _.collect{
+          case WebSocketFrame.Text(_, _) => WebSocketFrame.Text(LocalDateTime.now().toString)
+        }
+
+      import scala.concurrent.duration._
+      val connectedTime = Stream.awakeEvery[IO](5.second).map(d => WebSocketFrame.Text(s"You are connected: ${d.toSeconds} seconds"))
+
       for {
         // Unbounded queue to store WebSocket messages from the client, which are pending to be processed.
         // For production use bounded queue seems a better choice. Unbounded queue may result in out of
@@ -67,7 +76,7 @@ object WebSocketServer extends IOApp {
           // Sink, where the incoming WebSocket messages from the client are pushed to.
           receive = queue.enqueue,
           // Outgoing stream of WebSocket messages to send to the client.
-          send = queue.dequeue.through(echoPipe),
+          send = queue.dequeue.through(currentTimePipe).merge(connectedTime),
         )
       } yield response
 
