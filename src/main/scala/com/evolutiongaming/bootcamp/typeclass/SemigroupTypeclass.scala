@@ -68,11 +68,11 @@ object Generated {
     def append(x: A, y: A): A
   }
 
-  def combine[T: Semigroup](list: List[T]): Option[T] = {
-    Some(list)
-      .filter(_.nonEmpty)
-      .map(_.reduce(Semigroup[T].append)) // using syntax
-  }
+//  def combine[T: Semigroup](list: List[T]): Option[T] = {
+//    Some(list)
+//      .filter(_.nonEmpty)
+//      .map(_.reduce(Semigroup[T].append)) // using syntax
+//  }
 
 }
 

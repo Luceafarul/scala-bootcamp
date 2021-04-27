@@ -9,6 +9,8 @@ object Doobie extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] = {
 
+    implicit val logQuery: LogHandler = LogHandler.jdkLogHandler
+
     /** simplest possible `doobie` program */
     val rng: ConnectionIO[String] = "42".pure[ConnectionIO]
 
@@ -63,7 +65,8 @@ object Doobie extends IOApp {
       .make[IO]
       .use { xa =>
 //        val rng2 = rng.replicateA(5)
-        rng.transact(xa).map(println)
+        // ConnectionIO -> transact(Transactor[IO]) -> map(println)
+        rng.transact(xa).map(res => println(res))
         // streaming result
 //        rng.take(3).compile.toList.transact(xa).map(println)
       }

@@ -23,7 +23,7 @@ object FragmentsUsage extends IOApp {
           _ <- setup().transact(xa)
 
           // business part
-          _ <- fetchAuthorById(authorOdersky).option.transact(xa).map(println)
+//          _ <- fetchAuthorById(authorOdersky).option.transact(xa).map(println)
 //          _ <- fetchAuthorById(UUID.randomUUID()).option.transact(xa).map(println)
 //          _ <- fetchHarryPotterBooks.to[List].transact(xa).map(_.foreach(println))
 //          _ <- fetchBooksByAuthors(NonEmptyList.of(authorOdersky, authorRowling))
@@ -37,7 +37,7 @@ object FragmentsUsage extends IOApp {
 //              fetchBooksByAuthors(NonEmptyList.of(authorRowling)).to[List])
 //              .transact(xa)
 //              .map(_.foreach(println))
-//          _ <- updateYearOfBook(bookHPStone, Year.of(2003)).transact(xa)
+          _ <- updateYearOfBook(bookHPStone, Year.of(2003)).transact(xa)
         } yield ()
       }
       .as(ExitCode.Success)
@@ -80,15 +80,28 @@ object FragmentsUsage extends IOApp {
   }
 
   def fetchBooksByAuthors(ids: NonEmptyList[UUID]): doobie.Query0[BookWithAuthor] = {
+    implicit val logHandler: LogHandler = LogHandler.jdkLogHandler
     val queryBooks = fetchBooksAndAuthor ++ fr"WHERE" ++ Fragments.in(fr"author", ids)
     queryBooks.query[BookWithAuthor]
   }
 
-  def fetchBooksByYear(year: Int): doobie.ConnectionIO[List[Book]] = ???
+  def fetchBooksByYear(year: Int): doobie.ConnectionIO[List[Book]] = {
+    val queryBooks = books ++ fr"WHERE year = $year"
+    queryBooks.query[Book].to[List]
+  }
 
-  def fetchBooksByYearRange(yearFrom: Int, yearTo: Int): doobie.ConnectionIO[List[Book]] = ???
+  def fetchBooksByYearRange(yearFrom: Int, yearTo: Int): doobie.ConnectionIO[List[Book]] = {
+    val queryBooks = books ++ fr"WHERE year BETWEEN $yearFrom AND $yearTo"
+    queryBooks.query[Book].to[List]
+  }
 
-  def insertBook(title: String, authorId: UUID, year: Year): doobie.ConnectionIO[Int] = ???
+  def insertBook(title: String, authorId: UUID, year: Year): doobie.ConnectionIO[Int] = {
+    val insert = sql"INSERT INTO books (id, author, title, year) VALUES (${UUID.randomUUID()}, $authorId, $title, $year)"
+    insert.update.run
+  }
 
-  def updateYearOfBook(id: UUID, year: Year): doobie.ConnectionIO[Int] = ???
+  def updateYearOfBook(id: UUID, year: Year): doobie.ConnectionIO[Int] = {
+    val update = sql"UPDATE books SET year = $year WHERE id = $id"
+    update.update.run
+  }
 }
