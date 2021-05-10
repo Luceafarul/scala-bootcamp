@@ -11,13 +11,16 @@ implicit val timer = IO.timer(ExecutionContext.global)
 // You can convert them to lists just calling `.toList` method.
 
 Stream.emit(1)
+Stream.emit(1).toList
 Stream.emits(List(1, 2, 3))
+Stream.emits(List(1, 2, 3)).toList
 Stream(1, 2, 3)
 
 // Infinite streams:
 // Make sure to call `take` method (or similar) before converting them to lists.
 
 Stream.constant(42)
+Stream.constant(42).take(5).toList
 Stream.iterate(1)(_ + 2)
 Stream.unfold(1)(s => Some((s, s + 2)))
 
@@ -25,6 +28,7 @@ Stream.unfold(1)(s => Some((s, s + 2)))
 // To convert them to list you have to `compile` them first, i.e. compose all effects into one.
 
 Stream.eval(IO(println("hello")))
+Stream.eval(IO(println("hello"))).compile.toList
 Stream.random[IO].take(10).compile
 Stream.awakeEvery[IO](1.second)
 
@@ -33,6 +37,8 @@ Stream.awakeEvery[IO](1.second)
 
 val pipe: Pipe[Pure, Int, Int] = _.map(_ + 1)
 Stream(1, 2, 3).through(pipe)
+Stream(1, 2, 3).through(pipe).toList
+Stream(1, 2, 3).map(_ + 1).toList
 
 
 // fs2.Pull[F[_], O, R] pulls values from a stream, writes output of type O, and returns a result of type R.
@@ -41,3 +47,12 @@ Stream(1, 2, 3, 4, 5).pull.uncons1.flatMap {
   case Some(head -> tail) => tail.map(_ + head).pull.echo
   case None => Pull.done
 }.stream
+
+Stream(1, 2, 3, 4, 5).pull.uncons1.flatMap {
+  case Some(head -> tail) => tail.map(head -> _).pull.echo
+  case None => Pull.done
+}.stream.take(3).toList
+//  .uncons1.flatMap {
+//  case Some(head -> tail) => tail.map(_ + head).pull.echo
+//  case None => Pull.done
+//}.stream.take(3).toList

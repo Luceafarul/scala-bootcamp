@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.event.LoggingReceive
 
 object MessageProcessing extends App {
-  // every actor knows its own address (via self from Actor trait)
+  // every bn actor knows its own address (via self from Actor trait)
   // only messages can be sent to known address (ActorRef)
   // creating actor return its address
   // address can be sent via messages (to another actor or to self)

@@ -2,6 +2,8 @@ package com.evolutiongaming.bootcamp.akka.actors
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 
+import scala.collection.mutable.ArrayBuffer
+
 object Exercise1 extends App {
   object Protocol {
     final case class Task(id: Int)
@@ -23,11 +25,25 @@ object Exercise1 extends App {
     //    private val buffer: ArrayBuffer[Task] = ArrayBuffer.empty
     //    or
     //    private var buffer: Vector[Task] = Vector.empty
+    private val buffer: ArrayBuffer[Task] = ArrayBuffer.empty
 
     override def receive: Receive = {
       case task: Task =>
-        ???
+        buffer.addOne(task)
+        if (buffer.size == batchSize) {
+          sinkRef ! Tasks(buffer.toVector)
+          buffer.clear()
+        }
     }
+
+//    TODO: rework with context become (print 4 instead 3)
+//    private def addTask(tasks: Vector[Task]): Receive = {
+//      case task: Task =>
+//        if (tasks.size == batchSize) sinkRef ! Tasks(tasks)
+//        else context.become(addTask(tasks :+ task))
+//    }
+//
+//    override def receive: Receive = addTask(Vector.empty[Task])
   }
 
   final class WorkerActor extends Actor with ActorLogging {
@@ -50,5 +66,5 @@ object Exercise1 extends App {
     "batcher",
   )
 
-  (1.to(7)).map(Protocol.Task).foreach(batcherRef ! _)
+  1.to(7).map(Protocol.Task).foreach(batcherRef ! _)
 }

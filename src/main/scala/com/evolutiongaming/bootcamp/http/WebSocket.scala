@@ -16,6 +16,7 @@ import java.net.http.HttpClient
 import scala.concurrent.ExecutionContext
 import cats.effect.Clock
 
+import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDateTime}
 
 object WebSocketIntroduction {
@@ -60,12 +61,25 @@ object WebSocketServer extends IOApp {
         }
 
       val currentTimePipe: Pipe[IO, WebSocketFrame, WebSocketFrame] =
-        _.collect{
-          case WebSocketFrame.Text(_, _) => WebSocketFrame.Text(LocalDateTime.now().toString)
+        _.collect {
+          case WebSocketFrame.Text("What time is it?\n", _) => WebSocketFrame.Text(LocalDateTime.now().toString)
+          case WebSocketFrame.Text(message, _) => WebSocketFrame.Text(message)
+        }
+
+      val exercise1Solution: Pipe[IO, WebSocketFrame, WebSocketFrame] =
+        _.collect {
+          case WebSocketFrame.Text(message, _) => WebSocketFrame.Text(message.trim)
+        }.evalMap {
+          case WebSocketFrame.Text("What time is it?", _) =>
+            Clock[IO].instantNow.map { time => WebSocketFrame.Text(time.toString) }
+          case message =>
+            message.pure[IO]
         }
 
       import scala.concurrent.duration._
-      val connectedTime = Stream.awakeEvery[IO](5.second).map(d => WebSocketFrame.Text(s"You are connected: ${d.toSeconds} seconds"))
+      val connectedTime = Stream
+        .awakeEvery[IO](5.second)
+        .map(d => WebSocketFrame.Text(s"You are connected: ${d.toSeconds} seconds"))
 
       for {
         // Unbounded queue to store WebSocket messages from the client, which are pending to be processed.
@@ -74,17 +88,17 @@ object WebSocketServer extends IOApp {
         queue <- Queue.unbounded[IO, WebSocketFrame]
         response <- WebSocketBuilder[IO].build(
           // Sink, where the incoming WebSocket messages from the client are pushed to.
-          receive = queue.enqueue,
+          receive = queue.enqueue.compose(stream => stream.merge(connectedTime)),
           // Outgoing stream of WebSocket messages to send to the client.
           send = queue.dequeue.through(currentTimePipe).merge(connectedTime),
         )
       } yield response
 
-      // Exercise 1. Send current time to user when he asks it.
-      // Note: getting current time is a side effect.
+    // Exercise 1. Send current time to user when he asks it.
+    // Note: getting current time is a side effect.
 
-      // Exercise 2. Notify user periodically how long he is connected.
-      // Tip: you can merge streams via `merge` operator.
+    // Exercise 2. Notify user periodically how long he is connected.
+    // Tip: you can merge streams via `merge` operator.
   }
 
   // Topics provide an implementation of the publish-subscribe pattern with an arbitrary number of
@@ -95,15 +109,23 @@ object WebSocketServer extends IOApp {
     case GET -> Root / "chat" =>
       WebSocketBuilder[IO].build(
         // Sink, where the incoming WebSocket messages from the client are pushed to.
-        receive = chatTopic.publish.compose[Stream[IO, WebSocketFrame]](_.collect {
-          case WebSocketFrame.Text(message, _) => message
-        }),
+        // receive = chatTopic.publish.compose[Stream[IO, WebSocketFrame]](_.collect {
+        //          case WebSocketFrame.Text(message, _) => message
+        //        }),
+        receive = chatTopic.publish.compose[Stream[IO, WebSocketFrame]](stream => stream.pull.uncons1.flatMap {
+          case Some(value) =>
+            val (frame, tail) = value
+            frame match {
+              case WebSocketFrame.Text(name, _) => tail.map { case WebSocketFrame.Text(message, _) => s"${name.trim}: $message" }.pull.echo
+            }
+          case None => fs2.Pull.done
+        }.stream),
         // Outgoing stream of WebSocket messages to send to the client.
         send = chatTopic.subscribe(10).map(WebSocketFrame.Text(_)),
       )
 
-      // Exercise 3. Use first message from a user as his username and prepend it to each his message.
-      // Tip: to do this you will likely need fs2.Pull.
+    // Exercise 3. Use first message from a user as his username and prepend it to each his message.
+    // Tip: to do this you will likely need fs2.Pull.
   }
 
   private def httpApp(chatTopic: Topic[IO, String]) = {
@@ -114,11 +136,11 @@ object WebSocketServer extends IOApp {
     for {
       chatTopic <- Topic[IO, String]("Hello!")
       _ <- BlazeServerBuilder[IO](ExecutionContext.global)
-      .bindHttp(port = 9002, host = "localhost")
-      .withHttpApp(httpApp(chatTopic))
-      .serve
-      .compile
-      .drain
+        .bindHttp(port = 9002, host = "localhost")
+        .withHttpApp(httpApp(chatTopic))
+        .serve
+        .compile
+        .drain
     } yield ExitCode.Success
 }
 

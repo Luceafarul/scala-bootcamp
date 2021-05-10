@@ -18,6 +18,7 @@ object LifecycleAndSupervision extends App {
     }
     override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
       println(s"pre restart reason: ${ reason.getMessage }")
+      message.foreach(self ! _)
     }
     override def postRestart(reason: Throwable): Unit = {
       println("post restart")
