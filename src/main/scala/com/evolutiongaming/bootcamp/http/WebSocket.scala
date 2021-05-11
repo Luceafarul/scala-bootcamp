@@ -2,7 +2,7 @@ package com.evolutiongaming.bootcamp.http
 
 import cats.effect.{ExitCode, IO, IOApp, Resource}
 import cats.syntax.all._
-import fs2.{Pipe, Stream}
+import fs2.{Pipe, Pull, Stream}
 import fs2.concurrent.{Queue, Topic}
 import org.http4s._
 import org.http4s.client.jdkhttpclient.{JdkWSClient, WSConnectionHighLevel, WSFrame, WSRequest}
@@ -109,17 +109,25 @@ object WebSocketServer extends IOApp {
     case GET -> Root / "chat" =>
       WebSocketBuilder[IO].build(
         // Sink, where the incoming WebSocket messages from the client are pushed to.
-        // receive = chatTopic.publish.compose[Stream[IO, WebSocketFrame]](_.collect {
+        //        receive = chatTopic.publish.compose[Stream[IO, WebSocketFrame]](_.collect {
         //          case WebSocketFrame.Text(message, _) => message
         //        }),
-        receive = chatTopic.publish.compose[Stream[IO, WebSocketFrame]](stream => stream.pull.uncons1.flatMap {
-          case Some(value) =>
-            val (frame, tail) = value
-            frame match {
-              case WebSocketFrame.Text(name, _) => tail.map { case WebSocketFrame.Text(message, _) => s"${name.trim}: $message" }.pull.echo
-            }
-          case None => fs2.Pull.done
+        // Nice solution from mentor
+        receive = chatTopic.publish.compose[Stream[IO, WebSocketFrame]](_.collect {
+          case WebSocketFrame.Text(message, _) => message
+        }.pull.uncons1.flatMap {
+          case Some((name, messages)) => messages.map(message => s"${name.trim}: $message").pull.echo
+          case None => Pull.done
         }.stream),
+        // My solution
+        //        receive = chatTopic.publish.compose[Stream[IO, WebSocketFrame]](stream => stream.pull.uncons1.flatMap {
+        //          case Some(value) =>
+        //            val (frame, tail) = value
+        //            frame match {
+        //              case WebSocketFrame.Text(name, _) => tail.map { case WebSocketFrame.Text(message, _) => s"${name.trim}: $message" }.pull.echo
+        //            }
+        //          case None => fs2.Pull.done
+        //        }.stream),
         // Outgoing stream of WebSocket messages to send to the client.
         send = chatTopic.subscribe(10).map(WebSocketFrame.Text(_)),
       )
