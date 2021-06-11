@@ -63,6 +63,7 @@ object Doobie extends IOApp {
 
     DbTransactor
       .make[IO]
+//      .pooled[IO]
       .use { xa =>
 //        val rng2 = rng.replicateA(5)
         // ConnectionIO -> transact(Transactor[IO]) -> map(println)
